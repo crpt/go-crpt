@@ -4,6 +4,7 @@ import (
 	"crypto"
 	"crypto/ed25519"
 	"errors"
+	"github.com/nexzhu/go-crpt/internal/util"
 	"io"
 
 	ed25519sha3 "github.com/nexzhu/go-ed25519-sha3-512"
@@ -72,14 +73,14 @@ func (priv sha3PrivateKey) Public() crpt.PublicKey {
 func New(sha3 bool, hash crypto.Hash) crpt.Crpt {
 	crpt := &ed25519Crpt{
 		sha3:     sha3,
-		BaseCrpt: &crpt.BaseCrpt{HashFunc: hash, CanSignPreHashedMessages: false},
+		BaseCrpt: &util.BaseCrpt{HashFunc: hash, CanSignPreHashedMessages: false},
 	}
 	crpt.Crpt = crpt
 	return crpt
 }
 
 type ed25519Crpt struct {
-	*crpt.BaseCrpt
+	*util.BaseCrpt
 
 	sha3 bool
 }

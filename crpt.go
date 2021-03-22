@@ -7,7 +7,6 @@ package crpt
 
 import (
 	"crypto"
-	"errors"
 	"io"
 )
 
@@ -92,38 +91,4 @@ type Crpt interface {
 
 	// Verify reports whether sig is a valid signature of message by publicKey.
 	Verify(publicKey PublicKey, message []byte, sig Signature) (bool, error)
-}
-
-// BaseCrpt is a helper struct meant to be anonymously embedded by pointer in all
-// Crpt implementations.
-type BaseCrpt struct {
-	// HashFunc holds the hash function to be used for Crpt.Hash.
-	HashFunc crypto.Hash
-
-	// CanSignPreHashedMessages specify whether a Crpt implementation can sign the
-	// pre-hashed messages. See Crpt.SignMessage for details.
-	CanSignPreHashedMessages bool
-
-	// Crpt is the crpt.Crpt instance which is embedding this BaseCrpt instance.
-	Crpt Crpt
-}
-
-// Hash implements Crpt.Hash using BaseCrpt.HashFunc.
-func (crpt *BaseCrpt) Hash(b []byte) []byte {
-	h := crpt.HashFunc.New()
-	h.Write(b)
-	return h.Sum(nil)
-}
-
-var ErrMessageAndDigestAreBothEmpty = errors.New("message and digest are both empty")
-
-// Sign implements Crpt.Sign, see Crpt.Sign for details.
-func (crpt *BaseCrpt) Sign(privateKey PrivateKey, message, digest []byte, hashFunc crypto.Hash, rand io.Reader) (Signature, error) {
-	if len(digest) > 0 && crpt.CanSignPreHashedMessages {
-		return crpt.Crpt.SignDigest(privateKey, digest, hashFunc, rand)
-	} else if len(message) > 0 {
-		return crpt.Crpt.SignMessage(privateKey, message, rand)
-	} else {
-		return nil, ErrMessageAndDigestAreBothEmpty
-	}
 }
