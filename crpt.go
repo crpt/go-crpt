@@ -7,11 +7,21 @@ package crpt
 
 import (
 	"crypto"
+	"errors"
 	"io"
+)
+
+type Algorithm string
+
+const (
+	Ed25519          Algorithm = "Ed25519"
+	Ed25519_SHA3_512 Algorithm = "Ed25519-SHA3-512"
 )
 
 // Passing NotHashed as hashFunc to Crpt.Sign indicates that message is not hashed
 const NotHashed crypto.Hash = 0
+
+var ErrAlgorithmNotSupported = errors.New("algorithm not supported")
 
 // PublicKey represents a public key using an unspecified algorithm.
 type PublicKey interface {
