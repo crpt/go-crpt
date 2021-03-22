@@ -1,3 +1,10 @@
+// Copyright 2020 Nex Zhu. All rights reserved.
+// Use of this source code is governed by the MIT
+// license that can be found in the LICENSE file.
+
+// Package ed25519 provides the Ed25519 Crpt implementation backed by
+// [crypto/ed25519](https://pkg.go.dev/crypto/ed25519), and the Ed25519-SHA3-512 implementation backd by
+// [github.com/nexzhu/go-ed25519-sha3-512](https://pkg.go.dev/github.com/nexzhu/go-ed25519-sha3-512).
 package ed25519
 
 import (
@@ -70,13 +77,14 @@ func (priv sha3PrivateKey) Public() crpt.PublicKey {
 
 // New creates a Ed225519 Crpt, if sha3 is true, it uses SHA3-512 hash function
 // instead of normal SHA-512.
-func New(sha3 bool, hash crypto.Hash) crpt.Crpt {
-	crpt := &ed25519Crpt{
-		sha3:     sha3,
-		BaseCrpt: &util.BaseCrpt{HashFunc: hash, CanSignPreHashedMessages: false},
+func New(sha3 bool, hash crypto.Hash) (crpt.Crpt, error) {
+	crpt := &ed25519Crpt{sha3: sha3}
+	base, err := util.NewBaseCrpt(hash, false, crpt)
+	if err != nil {
+		return nil, err
 	}
-	crpt.Crpt = crpt
-	return crpt
+	crpt.BaseCrpt = base
+	return crpt, nil
 }
 
 type ed25519Crpt struct {

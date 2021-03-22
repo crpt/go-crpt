@@ -39,7 +39,7 @@ type Signature []byte
 
 // Crpt is the common crypto operations interface implemented by all crypto implementations.
 type Crpt interface {
-	// Hash calculates the hash of msg using underlying BaseCrpt.HashFunc.
+	// Hash calculates the hash of msg using underlying BaseCrpt.hashFunc.
 	//
 	// Crpt implementations generally don't need to implement this method as it is
 	// already implemented by embedded BaseCrpt.

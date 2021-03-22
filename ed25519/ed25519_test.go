@@ -1,11 +1,16 @@
+// Copyright 2020 Nex Zhu. All rights reserved.
+// Use of this source code is governed by the MIT
+// license that can be found in the LICENSE file.
+
 package ed25519
 
 import (
 	"crypto"
-	"github.com/nexzhu/go-crpt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/nexzhu/go-crpt"
 )
 
 var (
@@ -24,11 +29,13 @@ var (
 	testWrongData = []byte{0x1, 0x2, 0x3, 0x4}
 )
 
-func TestEd25519Crypto(t *testing.T) {
+func TestEd25519Crpt(t *testing.T) {
 	assert := assert.New(t)
 
-	c := New(false, crypto.SHA256)
-	c3 := New(true, crypto.SHA3_256)
+	c, err := New(false, crypto.SHA256)
+	assert.NoError(err)
+	c3, err := New(true, crypto.SHA3_256)
+	assert.NoError(err)
 	msg := []byte{0x1, 0x2, 0x3, 0x4}
 
 	t.Run("publicKey/privateKey", func(t *testing.T) {
