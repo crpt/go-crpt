@@ -12,6 +12,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+const NonExistentAlgorithm = "NonExistentAlgorithm"
+
 func TestCrpt(t *testing.T) {
 	assert := assert.New(t)
 
@@ -21,9 +23,19 @@ func TestCrpt(t *testing.T) {
 	_, err = New(crpt.Ed25519_SHA3_512, crypto.SHA3_256)
 	assert.NoError(err)
 
-	_, err = New("NonExistentAlgorithm", crypto.Hash(0))
+	_, err = New(NonExistentAlgorithm, crypto.Hash(0))
 	assert.Equal(crpt.ErrAlgorithmNotSupported, err)
 
-	_, err = New(crpt.Ed25519_SHA3_512, crypto.Hash(0))
+	_, err = New(crpt.Ed25519, crypto.Hash(0))
 	assert.Error(err)
+
+	MustNew(crpt.Ed25519, crypto.SHA256)
+
+	assert.Panics(func() {
+		MustNew(NonExistentAlgorithm, crypto.SHA256)
+	}, "should panic")
+
+	assert.Panics(func() {
+		MustNew(crpt.Ed25519, crypto.Hash(0))
+	}, "should panic")
 }
