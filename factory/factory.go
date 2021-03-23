@@ -24,7 +24,8 @@ func New(algorithm crpt.Algorithm, hashFunc crypto.Hash) (crpt.Crpt, error) {
 	}
 }
 
-// New creates a Crpt instance with the specified algorithm and hashFunc.
+// MustNew creates a Crpt instance with the specified algorithm and hashFunc,
+// it panics if an error occurs.
 func MustNew(algorithm crpt.Algorithm, hashFunc crypto.Hash) crpt.Crpt {
 	var crypt crpt.Crpt
 	var err error
