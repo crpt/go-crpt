@@ -54,10 +54,10 @@ func (pub sha3PublicKey) Bytes() []byte {
 // Address returns the public key as is instead of deriving address from the
 // public key by hashing and returning the last certain bytes, to avoid adding
 // extra space in transactions for public keys.
-func (pub publicKey) Address() crpt.Address {
+func (pub publicKey) Address() Address {
 	return crpt.Address(pub)
 }
-func (pub sha3PublicKey) Address() crpt.Address {
+func (pub sha3PublicKey) Address() Address {
 	return crpt.Address(pub)
 }
 
@@ -77,7 +77,7 @@ func (priv sha3PrivateKey) Public() crpt.PublicKey {
 
 // New creates a Ed225519 Crpt, if sha3 is true, it uses SHA3-512 hash function
 // instead of normal SHA-512.
-func New(sha3 bool, hash crypto.Hash) (crpt.Crpt, error) {
+func New(sha3 bool, hash crypto.Hash) (*ed25519Crpt, error) {
 	crpt := &ed25519Crpt{sha3: sha3}
 	base, err := util.NewBaseCrpt(hash, false, crpt)
 	if err != nil {
@@ -132,7 +132,7 @@ func (crpt *ed25519Crpt) GenerateKey(rand io.Reader) (crpt.PublicKey, crpt.Priva
 	}
 }
 
-func (crpt *ed25519Crpt) SignMessage(priv crpt.PrivateKey, message []byte, rand io.Reader) (crpt.Signature, error) {
+func (crpt *ed25519Crpt) SignMessage(priv crpt.PrivateKey, message []byte, rand io.Reader) (Signature, error) {
 	if crpt.sha3 {
 		if edpriv, ok := priv.(sha3PrivateKey); ok {
 			return ed25519sha3.Sign(ed25519sha3.PrivateKey(edpriv), message), nil
@@ -149,12 +149,12 @@ func (crpt *ed25519Crpt) SignMessage(priv crpt.PrivateKey, message []byte, rand 
 }
 
 func (crpt *ed25519Crpt) SignDigest(priv crpt.PrivateKey, digest []byte, hashFunc crypto.Hash,
-	rand io.Reader) (crpt.Signature, error) {
+	rand io.Reader) (Signature, error) {
 	panic("not supported: Ed25519 cannot handle pre-hashed messages, " +
 		"see: https://pkg.go.dev/crypto/ed25519#PrivateKey.Sign")
 }
 
-func (crpt *ed25519Crpt) Verify(pub crpt.PublicKey, message []byte, sig crpt.Signature) (bool,
+func (crpt *ed25519Crpt) Verify(pub crpt.PublicKey, message []byte, sig Signature) (bool,
 	error) {
 	if crpt.sha3 {
 		if edpub, ok := pub.(sha3PublicKey); ok {
