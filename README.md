@@ -4,6 +4,10 @@
 
 It's especially useful for DLT projects.
 
+## Usage
+
+See [godoc](https://pkg.go.dev/github.com/nexzhu/go-crpt).
+
 ## Currently available implementations:
 
 - Package `ed25519` provides the Ed25519 implementation backed by
