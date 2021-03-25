@@ -4,19 +4,18 @@
 
 // Package ed25519 provides the Ed25519 Crpt implementation backed by
 // [crypto/ed25519](https://pkg.go.dev/crypto/ed25519), and the Ed25519-SHA3-512 implementation backd by
-// [github.com/nexzhu/go-ed25519-sha3-512](https://pkg.go.dev/github.com/nexzhu/go-ed25519-sha3-512).
+// [github.com/crpt/go-ed25519-sha3-512](https://pkg.go.dev/github.com/crpt/go-ed25519-sha3-512).
 package ed25519
 
 import (
 	"crypto"
 	"crypto/ed25519"
 	"errors"
-	"github.com/nexzhu/go-crpt/internal/util"
 	"io"
 
-	ed25519sha3 "github.com/nexzhu/go-ed25519-sha3-512"
-
-	"github.com/nexzhu/go-crpt"
+	"github.com/crpt/go-crpt"
+	"github.com/crpt/go-crpt/internal/util"
+	ed25519sha3 "github.com/crpt/go-ed25519-sha3-512"
 )
 
 var (

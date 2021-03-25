@@ -8,8 +8,8 @@ package factory
 import (
 	"crypto"
 
-	"github.com/nexzhu/go-crpt"
-	"github.com/nexzhu/go-crpt/ed25519"
+	"github.com/crpt/go-crpt"
+	"github.com/crpt/go-crpt/ed25519"
 )
 
 // New creates a Crpt instance with the specified algorithm and hashFunc.

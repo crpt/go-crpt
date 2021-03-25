@@ -6,10 +6,11 @@ package factory
 
 import (
 	"crypto"
-	"github.com/nexzhu/go-crpt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/crpt/go-crpt"
 )
 
 const NonExistentAlgorithm = "NonExistentAlgorithm"

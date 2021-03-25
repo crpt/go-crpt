@@ -10,7 +10,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/nexzhu/go-crpt"
+	"github.com/crpt/go-crpt"
 )
 
 var (

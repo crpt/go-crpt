@@ -8,9 +8,10 @@ package util
 import (
 	"crypto"
 	"errors"
-	"github.com/nexzhu/go-crpt"
 	"io"
 	"strconv"
+
+	"github.com/crpt/go-crpt"
 )
 
 // BaseCrpt is a helper struct meant to be anonymously embedded by pointer in all
