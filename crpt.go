@@ -49,6 +49,18 @@ type Signature []byte
 
 // Crpt is the common crypto operations interface implemented by all crypto implementations.
 type Crpt interface {
+	// Algorithm reports the algorithm used.
+	//
+	// Crpt implementations generally don't need to implement this method as it is
+	// already implemented by embedded BaseCrpt.
+	Algorithm() Algorithm
+
+	// HashFunc reports the hash function to be used for Crpt.Hash.
+	//
+	// Crpt implementations generally don't need to implement this method as it is
+	// already implemented by embedded BaseCrpt.
+	HashFunc() crypto.Hash
+
 	// Hash calculates the hash of msg using underlying BaseCrpt.hashFunc.
 	//
 	// Crpt implementations generally don't need to implement this method as it is

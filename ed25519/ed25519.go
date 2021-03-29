@@ -77,13 +77,17 @@ func (priv sha3PrivateKey) Public() crpt.PublicKey {
 // New creates a Ed225519 Crpt, if sha3 is true, it uses SHA3-512 hash function
 // instead of normal SHA-512.
 func New(sha3 bool, hash crypto.Hash) (*ed25519Crpt, error) {
-	crpt := &ed25519Crpt{sha3: sha3}
-	base, err := util.NewBaseCrpt(hash, false, crpt)
+	crypt := &ed25519Crpt{sha3: sha3}
+	algo := crpt.Ed25519
+	if sha3 {
+		algo = crpt.Ed25519_SHA3_512
+	}
+	base, err := util.NewBaseCrpt(algo, hash, false, crypt)
 	if err != nil {
 		return nil, err
 	}
-	crpt.BaseCrpt = base
-	return crpt, nil
+	crypt.BaseCrpt = base
+	return crypt, nil
 }
 
 type ed25519Crpt struct {

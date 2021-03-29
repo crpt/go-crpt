@@ -17,6 +17,9 @@ import (
 // BaseCrpt is a helper struct meant to be anonymously embedded by pointer in all
 // Crpt implementations.
 type BaseCrpt struct {
+	// Algorithm used for embedding crpt.Crpt instance
+	algorithm crpt.Algorithm
+
 	// hashFunc holds the hash function to be used for Crpt.Hash.
 	hashFunc crypto.Hash
 
@@ -28,7 +31,7 @@ type BaseCrpt struct {
 	parentCrpt crpt.Crpt
 }
 
-func NewBaseCrpt(hashFunc crypto.Hash, canSignPreHashedMessages bool,
+func NewBaseCrpt(algorithm crpt.Algorithm, hashFunc crypto.Hash, canSignPreHashedMessages bool,
 	parentCrpt crpt.Crpt) (*BaseCrpt, error) {
 	if !hashFunc.Available() {
 		return nil, errors.New("crpt: requested hash function #" +
@@ -38,10 +41,21 @@ func NewBaseCrpt(hashFunc crypto.Hash, canSignPreHashedMessages bool,
 		panic("implementations should always pass parentCrpt")
 	}
 	return &BaseCrpt{
+		algorithm:                algorithm,
 		hashFunc:                 hashFunc,
 		canSignPreHashedMessages: canSignPreHashedMessages,
 		parentCrpt:               parentCrpt,
 	}, nil
+}
+
+// Algorithm implements crpt.Algorithm.
+func (crpt *BaseCrpt) Algorithm() crpt.Algorithm {
+	return crpt.algorithm
+}
+
+// HashFunc implements crpt.HashFunc.
+func (crpt *BaseCrpt) HashFunc() crypto.Hash {
+	return crpt.hashFunc
 }
 
 // Hash implements Crpt.Hash using BaseCrpt.hashFunc.
