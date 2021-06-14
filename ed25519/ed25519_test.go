@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/crpt/go-crpt"
 )
@@ -31,18 +32,19 @@ var (
 
 func TestEd25519Crpt(t *testing.T) {
 	assert := assert.New(t)
+	require := require.New(t)
 
 	c, err := New(false, crypto.SHA256)
-	assert.NoError(err)
+	require.NoError(err)
 	c3, err := New(true, crypto.SHA3_256)
-	assert.NoError(err)
+	require.NoError(err)
 	msg := []byte{0x1, 0x2, 0x3, 0x4}
 
 	t.Run("publicKey/privateKey", func(t *testing.T) {
 		pub, priv, err := c.GenerateKey(nil)
-		assert.NoError(err)
+		require.NoError(err)
 		pub3, priv3, err := c3.GenerateKey(nil)
-		assert.NoError(err)
+		require.NoError(err)
 		//fmt.Printf("%x", priv3.Bytes())
 		//fmt.Println(base64.StdEncoding.EncodeToString(priv3.Bytes()))
 
@@ -76,9 +78,9 @@ func TestEd25519Crpt(t *testing.T) {
 
 	t.Run("XxxFromBytes, SignXxx, Verify", func(t *testing.T) {
 		priv, err := c.PrivateKeyFromBytes(testPrivateKey)
-		assert.NoError(err)
+		require.NoError(err)
 		priv3, err := c3.PrivateKeyFromBytes(testSha3PrivateKey)
-		assert.NoError(err)
+		require.NoError(err)
 
 		_, err = c.PrivateKeyFromBytes(testWrongData)
 		assert.Equal(ErrWrongPrivateKeySize, err)
@@ -100,22 +102,22 @@ func TestEd25519Crpt(t *testing.T) {
 		assert.NotEqual(pub, pub3)
 
 		sig, err := c.Sign(priv, msg, nil, crpt.NotHashed, nil)
-		assert.NoError(err)
+		require.NoError(err)
 		_, err = c.Sign(priv3, msg, nil, crpt.NotHashed, nil)
 		assert.Equal(ErrNotEd25519PrivateKey, err)
 
 		sig3, err := c3.Sign(priv3, msg, nil, crpt.NotHashed, nil)
-		assert.NoError(err)
+		require.NoError(err)
 		_, err = c3.Sign(priv, msg, nil, crpt.NotHashed, nil)
 		assert.Equal(ErrNotEd25519SHA3PrivateKey, err)
 
 		assert.NotEqual(sig, sig3)
 
 		sig_, err := c.SignMessage(priv, msg, nil)
-		assert.NoError(err)
+		require.NoError(err)
 		assert.Equal(sig, sig_)
 		sig3_, err := c3.SignMessage(priv3, msg, nil)
-		assert.NoError(err)
+		require.NoError(err)
 		assert.Equal(sig3, sig3_)
 
 		assert.Panics(func() { c.SignDigest(priv, msg, crpt.NotHashed, nil) },
