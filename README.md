@@ -10,6 +10,15 @@ See [godoc](https://pkg.go.dev/github.com/crpt/go-crpt).
 
 ## Currently available implementations:
 
-- Package `ed25519` provides the Ed25519 implementation backed by
-  [crypto/ed25519](https://pkg.go.dev/crypto/ed25519), and the Ed25519-SHA3-512 implementation backd
-  by [github.com/crpt/go-ed25519-sha3-512](https://pkg.go.dev/github.com/crpt/go-ed25519-sha3-512).
+## ed25519
+
+Package `ed25519` provides an Ed25519 implementation backed by [crypto/ed25519](https://pkg.go.dev/crypto/ed25519) std package,
+but using [ed25519consensus](https://pkg.go.dev/github.com/hdevalence/ed25519consensus) package for signature verification,
+which conforms to [ZIP 215](https://zips.z.cash/zip-0215) specification, making it suitable for consensus-critical contexts,
+see [README from ed25519consensus](https://github.com/hdevalence/ed25519consensus) for the explanation.
+
+It also provides an Ed25519-SHA3-512 implementation backed by [go-ed25519-sha3-512](https://pkg.go.dev/github.com/crpt/go-ed25519-sha3-512) package,
+which is a fork of [crypto/ed25519](https://pkg.go.dev/crypto/ed25519) std package, modified to use SHA3-512 instead of SHA-512.
+using [go-ed25519consensus-sha3-512](https://pkg.go.dev/github.com/crpt/go-ed25519consensus-sha3-512) package for signature verification,
+which is a fork of [ed25519consensus](https://pkg.go.dev/github.com/hdevalence/ed25519consensus) package, modified to use SHA3-512 instead of SHA-512.
+So it's also suitable for consensus-critical contexts.

@@ -1,5 +1,11 @@
-github.com/crpt/go-ed25519-sha3-512 v1.1.0 h1:/45W+yYD/zHf8+M+VcH9tsISLwDVyTElIzMV2SQ5Npg=
-github.com/crpt/go-ed25519-sha3-512 v1.1.0/go.mod h1:oUGu0UWNhGpilJFKhxL64hR3rFKNaPCasz+qjCvvnqw=
+filippo.io/edwards25519 v1.0.0-rc.1 h1:m0VOOB23frXZvAOK44usCgLWvtsxIoMCTBGJZlpmGfU=
+filippo.io/edwards25519 v1.0.0-rc.1/go.mod h1:N1IkdkCkiLB6tki+MYJoSx2JTY9NUlxZE7eHn5EwJns=
+github.com/crpt/go-ed25519-sha3-512 v1.1.2 h1:SlEzmoKtqcM5/w1IsRO6FUbaHRZfjwio7l4RtNW7lsc=
+github.com/crpt/go-ed25519-sha3-512 v1.1.2/go.mod h1:zHtGwjnVmcxLU4Lp8VwGuvImY+RJyVBh3z4wlqJcPtY=
+github.com/crpt/go-ed25519consensus v0.0.0-20211108162203-2edba5fb514d h1:Mps02xPHtl9M28lM2Uovi++tPoLVxv0vPdUhfVtQLHk=
+github.com/crpt/go-ed25519consensus v0.0.0-20211108162203-2edba5fb514d/go.mod h1:LZIYMa0DBxqk27SaMwAHEqvxDyqF95aGCTOad+pBCP8=
+github.com/crpt/go-ed25519consensus-sha3-512 v0.0.0-20211108155746-78fa3c0ee791 h1:rM6H7OgmsbGe88emU1DUq3Sd3n4f2inH8ffnI7B23xo=
+github.com/crpt/go-ed25519consensus-sha3-512 v0.0.0-20211108155746-78fa3c0ee791/go.mod h1:3BZy+dn87cWgRuatVP3tGenTbOxCbDp3mEc4noDfzjA=
 github.com/davecgh/go-spew v1.1.0 h1:ZDRjVQ15GmhC3fiQ8ni8+OwkZQO4DARzQgrnXU1Liz8=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
