@@ -88,11 +88,11 @@ func (priv sha3PrivateKey) Public() crpt.PublicKey {
 // instead of normal SHA-512.
 func New(sha3 bool, hash crypto.Hash) (*ed25519Crpt, error) {
 	crypt := &ed25519Crpt{sha3: sha3}
-	algo := crpt.Ed25519
+	ktype := crpt.Ed25519
 	if sha3 {
-		algo = crpt.Ed25519_SHA3_512
+		ktype = crpt.Ed25519_SHA3_512
 	}
-	base, err := util.NewBaseCrpt(algo, hash, false, crypt)
+	base, err := util.NewBaseCrpt(ktype, hash, false, crypt)
 	if err != nil {
 		return nil, err
 	}
@@ -106,37 +106,37 @@ type ed25519Crpt struct {
 	sha3 bool
 }
 
-func (crpt *ed25519Crpt) PublicKeyFromBytes(pub []byte) (crpt.PublicKey, error) {
+func (c *ed25519Crpt) PublicKeyFromBytes(pub []byte) (crpt.PublicKey, error) {
 	if len(pub) != ed25519.PublicKeySize {
 		return nil, ErrWrongPublicKeySize
 	}
-	if crpt.sha3 {
+	if c.sha3 {
 		return sha3PublicKey(pub), nil
 	} else {
 		return publicKey(pub), nil
 	}
 }
 
-func (crpt *ed25519Crpt) PrivateKeyFromBytes(priv []byte) (crpt.PrivateKey, error) {
+func (c *ed25519Crpt) PrivateKeyFromBytes(priv []byte) (crpt.PrivateKey, error) {
 	if len(priv) != ed25519.PrivateKeySize {
 		return nil, ErrWrongPrivateKeySize
 	}
-	if crpt.sha3 {
+	if c.sha3 {
 		return sha3PrivateKey(priv), nil
 	} else {
 		return privateKey(priv), nil
 	}
 }
 
-func (crpt *ed25519Crpt) SignatureFromBytes(sig []byte) (crpt.Signature, error) {
+func (c *ed25519Crpt) SignatureFromBytes(sig []byte) (crpt.Signature, error) {
 	if len(sig) != ed25519.SignatureSize {
 		return nil, ErrWrongSignatureSize
 	}
 	return sig, nil
 }
 
-func (crpt *ed25519Crpt) GenerateKey(rand io.Reader) (crpt.PublicKey, crpt.PrivateKey, error) {
-	if crpt.sha3 {
+func (c *ed25519Crpt) GenerateKey(rand io.Reader) (crpt.PublicKey, crpt.PrivateKey, error) {
+	if c.sha3 {
 		pub, priv, err := ed25519sha3.GenerateKey(rand)
 		return sha3PublicKey(pub), sha3PrivateKey(priv), err
 	} else {
@@ -145,8 +145,9 @@ func (crpt *ed25519Crpt) GenerateKey(rand io.Reader) (crpt.PublicKey, crpt.Priva
 	}
 }
 
-func (crpt *ed25519Crpt) SignMessage(priv crpt.PrivateKey, message []byte, rand io.Reader) (Signature, error) {
-	if crpt.sha3 {
+func (c *ed25519Crpt) SignMessage(priv crpt.PrivateKey, message []byte, rand io.Reader,
+) (Signature, error) {
+	if c.sha3 {
 		if edpriv, ok := priv.(sha3PrivateKey); ok {
 			return ed25519sha3.Sign(ed25519sha3.PrivateKey(edpriv), message), nil
 		} else {
@@ -161,15 +162,15 @@ func (crpt *ed25519Crpt) SignMessage(priv crpt.PrivateKey, message []byte, rand 
 	}
 }
 
-func (crpt *ed25519Crpt) SignDigest(priv crpt.PrivateKey, digest []byte, hashFunc crypto.Hash,
-	rand io.Reader) (Signature, error) {
+func (c *ed25519Crpt) SignDigest(priv crpt.PrivateKey, digest []byte, hashFunc crypto.Hash, rand io.Reader,
+) (Signature, error) {
 	panic("not supported: Ed25519 cannot handle pre-hashed messages, " +
 		"see: https://pkg.go.dev/crypto/ed25519#PrivateKey.Sign")
 }
 
-func (crpt *ed25519Crpt) Verify(pub crpt.PublicKey, message []byte, sig Signature) (bool,
-	error) {
-	if crpt.sha3 {
+func (c *ed25519Crpt) Verify(pub crpt.PublicKey, message []byte, sig Signature,
+) (bool, error) {
+	if c.sha3 {
 		if edpub, ok := pub.(sha3PublicKey); ok {
 			// This implementation has defined criteria (ZIP 215 w/ SHA3-512) for signature validity
 			return ed25519consensus_sha3.Verify(ed25519sha3.PublicKey(edpub), message, sig), nil

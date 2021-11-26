@@ -11,19 +11,21 @@ import (
 	"io"
 )
 
-type Algorithm string
+type KeyType uint8
 
 const (
-	Ed25519          Algorithm = "Ed25519"
-	Ed25519_SHA3_512 Algorithm = "Ed25519-SHA3-512"
+	Ed25519 KeyType = iota
+	Ed25519_SHA3_512
+	// Only for test
+	CurrentKeyTypeCount
 )
 
 // Passing NotHashed as hashFunc to Crpt.Sign indicates that message is not hashed
 const NotHashed crypto.Hash = 0
 
-var ErrAlgorithmNotSupported = errors.New("algorithm not supported")
+var ErrKeyTypeNotSupported = errors.New("key type not supported")
 
-// PublicKey represents a public key using an unspecified algorithm.
+// PublicKey represents a public key with an unspecified key type.
 type PublicKey interface {
 	// Bytes returns the bytes representation of the public key.
 	Bytes() []byte
@@ -32,7 +34,7 @@ type PublicKey interface {
 	Address() Address
 }
 
-// PrivateKey represents a private key using an unspecified algorithm.
+// PrivateKey represents a private key with an unspecified key type.
 type PrivateKey interface {
 	// Bytes returns the bytes representation of the private key.
 	Bytes() []byte
@@ -49,11 +51,11 @@ type Signature []byte
 
 // Crpt is the common crypto operations interface implemented by all crypto implementations.
 type Crpt interface {
-	// Algorithm reports the algorithm used.
+	// KeyType reports the key type used.
 	//
 	// Crpt implementations generally don't need to implement this method as it is
 	// already implemented by embedded BaseCrpt.
-	Algorithm() Algorithm
+	KeyType() KeyType
 
 	// HashFunc reports the hash function to be used for Crpt.Hash.
 	//

@@ -55,9 +55,9 @@ func TestEd25519Crpt(t *testing.T) {
 		assert.Equal(pub3, priv3.Public())
 	})
 
-	t.Run("Algorithm & HashFunc", func(t *testing.T) {
-		assert.Equal(crpt.Ed25519, c.Algorithm())
-		assert.Equal(crpt.Ed25519_SHA3_512, c3.Algorithm())
+	t.Run("KeyType & HashFunc", func(t *testing.T) {
+		assert.Equal(crpt.Ed25519, c.KeyType())
+		assert.Equal(crpt.Ed25519_SHA3_512, c3.KeyType())
 		assert.Equal(crypto.SHA256, c.HashFunc())
 		assert.Equal(crypto.SHA3_256, c3.HashFunc())
 	})

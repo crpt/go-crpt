@@ -13,7 +13,7 @@ import (
 	"github.com/crpt/go-crpt"
 )
 
-const NonExistentAlgorithm = "NonExistentAlgorithm"
+const NonExistentKeyType = crpt.CurrentKeyTypeCount
 
 func TestCrpt(t *testing.T) {
 	assert := assert.New(t)
@@ -24,8 +24,8 @@ func TestCrpt(t *testing.T) {
 	_, err = New(crpt.Ed25519_SHA3_512, crypto.SHA3_256)
 	assert.NoError(err)
 
-	_, err = New(NonExistentAlgorithm, crypto.Hash(0))
-	assert.Equal(crpt.ErrAlgorithmNotSupported, err)
+	_, err = New(NonExistentKeyType, crypto.Hash(0))
+	assert.Equal(crpt.ErrKeyTypeNotSupported, err)
 
 	_, err = New(crpt.Ed25519, crypto.Hash(0))
 	assert.Error(err)
@@ -33,7 +33,7 @@ func TestCrpt(t *testing.T) {
 	MustNew(crpt.Ed25519, crypto.SHA256)
 
 	assert.Panics(func() {
-		MustNew(NonExistentAlgorithm, crypto.SHA256)
+		MustNew(NonExistentKeyType, crypto.SHA256)
 	}, "should panic")
 
 	assert.Panics(func() {
