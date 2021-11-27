@@ -13,7 +13,7 @@ import (
 	"github.com/crpt/go-crpt"
 )
 
-const NonExistentKeyType = crpt.CurrentKeyTypeCount
+const NonExistentKeyType = 0
 
 func TestCrpt(t *testing.T) {
 	assert := assert.New(t)

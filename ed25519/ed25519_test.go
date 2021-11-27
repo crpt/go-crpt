@@ -21,7 +21,7 @@ var (
 		0xc4, 0xdf, 0xd5, 0x6d, 0x89, 0x28, 0x5d, 0x2d, 0x0f, 0x9a, 0x04, 0x12, 0x91, 0x48, 0x41, 0x22,
 		0x3b, 0x94, 0x06, 0xdb, 0xaf, 0x6c, 0xe5, 0x13, 0x07, 0xba, 0x57, 0x5b, 0xa4, 0x4c, 0xe5, 0x5f,
 	}
-	testSha3PrivateKey = []byte{
+	testSHA3PrivateKey = []byte{
 		0x42, 0xeb, 0x4b, 0xbe, 0x27, 0x0c, 0x3c, 0xf5, 0x63, 0xf7, 0xf2, 0xdd, 0xfc, 0x9e, 0xef, 0xbc,
 		0xa6, 0xc8, 0xf0, 0x66, 0xf3, 0x45, 0xbd, 0x77, 0xae, 0x44, 0xd5, 0x5c, 0x5e, 0x02, 0xe2, 0x70,
 		0xac, 0x6d, 0x1b, 0x20, 0x52, 0x1f, 0x97, 0xa1, 0xa4, 0xcd, 0xb8, 0xd7, 0xc7, 0x94, 0x4a, 0xed,
@@ -39,6 +39,7 @@ func TestEd25519Crpt(t *testing.T) {
 	c3, err := New(true, crypto.SHA3_256)
 	require.NoError(err)
 	msg := []byte{0x1, 0x2, 0x3, 0x4}
+	msg2 := []byte{0x1, 0x2, 0x3, 0x4, 0x5}
 
 	t.Run("publicKey/privateKey", func(t *testing.T) {
 		pub, priv, err := c.GenerateKey(nil)
@@ -64,22 +65,28 @@ func TestEd25519Crpt(t *testing.T) {
 
 	t.Run("Hash", func(t *testing.T) {
 		h := c.Hash(msg)
+		ht := c.HashTyped(msg)
 		hash := crypto.SHA256.New()
 		hash.Write(msg)
 		h_ := hash.Sum(nil)
 		assert.Equal(h_, h)
+		assert.Equal(byte(crypto.SHA256), ht[0])
+		assert.Equal(h_, []byte(ht[1:]))
 
 		h3 := c3.Hash(msg)
+		h3t := c3.HashTyped(msg)
 		hash3 := crypto.SHA3_256.New()
 		hash3.Write(msg)
 		h3_ := hash3.Sum(nil)
 		assert.Equal(h3_, h3)
+		assert.Equal(byte(crypto.SHA3_256), h3t[0])
+		assert.Equal(h3_, []byte(h3t[1:]))
 	})
 
 	t.Run("XxxFromBytes, SignXxx, Verify", func(t *testing.T) {
 		priv, err := c.PrivateKeyFromBytes(testPrivateKey)
 		require.NoError(err)
-		priv3, err := c3.PrivateKeyFromBytes(testSha3PrivateKey)
+		priv3, err := c3.PrivateKeyFromBytes(testSHA3PrivateKey)
 		require.NoError(err)
 
 		_, err = c.PrivateKeyFromBytes(testWrongData)
@@ -105,11 +112,15 @@ func TestEd25519Crpt(t *testing.T) {
 		require.NoError(err)
 		_, err = c.Sign(priv3, msg, nil, crpt.NotHashed, nil)
 		assert.Equal(ErrNotEd25519PrivateKey, err)
+		sig2, err := c.Sign(priv, msg2, nil, crpt.NotHashed, nil)
+		require.NoError(err)
 
 		sig3, err := c3.Sign(priv3, msg, nil, crpt.NotHashed, nil)
 		require.NoError(err)
 		_, err = c3.Sign(priv, msg, nil, crpt.NotHashed, nil)
 		assert.Equal(ErrNotEd25519SHA3PrivateKey, err)
+		sig32, err := c3.Sign(priv3, msg2, nil, crpt.NotHashed, nil)
+		require.NoError(err)
 
 		assert.NotEqual(sig, sig3)
 
@@ -128,19 +139,23 @@ func TestEd25519Crpt(t *testing.T) {
 		ok, err := c.Verify(pub, msg, sig)
 		assert.NoError(err)
 		assert.True(ok)
-		ok, err = c.Verify(pub, msg, sig3)
-		assert.NoError(err)
-		assert.False(ok)
 		_, err = c.Verify(pub3, msg, sig3)
 		assert.Equal(ErrNotEd25519PublicKey, err)
+		_, err = c.Verify(pub, msg, sig3)
+		assert.Equal(ErrNotEd25519Signature, err)
+		ok, err = c.Verify(pub, msg, sig2)
+		assert.NoError(err)
+		assert.False(ok)
 
 		ok, err = c3.Verify(pub3, msg, sig3)
 		assert.NoError(err)
 		assert.True(ok)
-		ok, err = c3.Verify(pub3, msg, sig)
-		assert.NoError(err)
-		assert.False(ok)
 		_, err = c3.Verify(pub, msg, sig3)
 		assert.Equal(ErrNotEd25519SHA3PublicKey, err)
+		ok, err = c3.Verify(pub3, msg, sig)
+		assert.Equal(ErrNotEd25519SHA3Signature, err)
+		ok, err = c3.Verify(pub3, msg, sig32)
+		assert.NoError(err)
+		assert.False(ok)
 	})
 }

@@ -14,10 +14,8 @@ import (
 type KeyType uint8
 
 const (
-	Ed25519 KeyType = iota
+	Ed25519 KeyType = 1 + iota
 	Ed25519_SHA3_512
-	// Only for test
-	CurrentKeyTypeCount
 )
 
 // Passing NotHashed as hashFunc to Crpt.Sign indicates that message is not hashed
@@ -25,29 +23,88 @@ const NotHashed crypto.Hash = 0
 
 var ErrKeyTypeNotSupported = errors.New("key type not supported")
 
-// PublicKey represents a public key with an unspecified key type.
+// PublicKey represents a public key with a specific key type.
 type PublicKey interface {
+	// KeyType returns the key type.
+	KeyType() KeyType
+
 	// Bytes returns the bytes representation of the public key.
+	//
+	// NOTE: It's not safe to modify the returned slice because the implementations most likely
+	// return the underlying byte slice directly for the performance reason. Copy it if you need to modify.
 	Bytes() []byte
 
+	// TypedBytes returns the TypedPublicKey bytes representation of the public key.
+	//
+	// NOTE: It's not safe to modify the returned slice because the implementations most likely
+	// return the underlying byte slice directly for the performance reason. Copy it if you need to modify.
+	TypedBytes() TypedPublicKey
+
 	// Address returns the address derived from the public key.
+	//
+	// NOTE: It's not safe to modify the returned slice because the implementations most likely
+	// return the underlying byte slice directly for the performance reason. Copy it if you need to modify.
 	Address() Address
 }
 
-// PrivateKey represents a private key with an unspecified key type.
+// PrivateKey represents a private key with a specific key type.
 type PrivateKey interface {
+	// KeyType returns the key type.
+	KeyType() KeyType
+
 	// Bytes returns the bytes representation of the private key.
+	//
+	// NOTE: It's not safe to modify the returned slice because the implementations most likely
+	// return the underlying byte slice directly for the performance reason. Copy it if you need to modify.
 	Bytes() []byte
 
+	// TypedBytes returns the TypedPrivateKey bytes representation of the private key.
+	//
+	// NOTE: It's not safe to modify the returned slice because the implementations most likely
+	// return the underlying byte slice directly for the performance reason. Copy it if you need to modify.
+	TypedBytes() TypedPrivateKey
+
 	// Public returns the public key corresponding to the private key.
+	//
+	// NOTE: It's not safe to modify the returned slice because the implementations most likely
+	// return the underlying byte slice directly for the performance reason. Copy it if you need to modify.
 	Public() PublicKey
 }
+
+// Signature represents a digital signature produced by signing a message.
+type Signature interface {
+	// KeyType returns the key type used to compute the signature.
+	KeyType() KeyType
+
+	// Bytes returns the bytes representation of the signature.
+	//
+	// NOTE: It's not safe to modify the returned slice because the implementations most likely
+	// return the underlying byte slice directly for the performance reason. Copy it if you need to modify.
+	Bytes() []byte
+
+	// TypedBytes returns the TypedSignature bytes representation of the signature.
+	//
+	// NOTE: It's not safe to modify the returned slice because the implementations most likely
+	// return the underlying byte slice directly for the performance reason. Copy it if you need to modify.
+	TypedBytes() TypedSignature
+}
+
+// TypedPublicKey consists of 1-byte KeyType of a PublicKey concatenated with its bytes representation.
+type TypedPublicKey []byte
+
+// TypedPrivateKey consists of 1-byte KeyType of a PrivateKey concatenated with its bytes representation.
+type TypedPrivateKey []byte
+
+// TypedSignature consists of 1-byte representation of crypto.Hash used as uint8 concatenated with
+// the signature's bytes representation.
+type TypedSignature []byte
 
 // Address represents an address derived from a PublicKey.
 type Address []byte
 
-// Signature represents a digital signature produced by signing a message.
-type Signature []byte
+// TypedHash consists of 1-byte representation of crypto.Hash used as uint8 concatenated with
+// the bytes representation of the hash
+type TypedHash []byte
 
 // Crpt is the common crypto operations interface implemented by all crypto implementations.
 type Crpt interface {
@@ -68,6 +125,13 @@ type Crpt interface {
 	// Crpt implementations generally don't need to implement this method as it is
 	// already implemented by embedded BaseCrpt.
 	Hash(msg []byte) []byte
+
+	// HashTyped calculates the hash of msg using underlying BaseCrpt.hashFunc
+	// and return its TypedHash bytes representation.
+	//
+	// Crpt implementations generally don't need to implement this method as it is
+	// already implemented by embedded BaseCrpt.
+	HashTyped(msg []byte) TypedHash
 
 	// PublicKeyFromBytes constructs a PublicKey from bytes.
 	PublicKeyFromBytes(publicKey []byte) (PublicKey, error)
@@ -115,4 +179,20 @@ type Crpt interface {
 
 	// Verify reports whether sig is a valid signature of message by publicKey.
 	Verify(publicKey PublicKey, message []byte, sig Signature) (bool, error)
+}
+
+// Raw return the raw bytes of the public key without the 1-byte key type prefix.
+//
+// The returned byte slice is not safe to modify because it returns the underlying byte slice
+// directly for the performance reason. Copy it if you need to modify.
+func (pub TypedPublicKey) Raw() []byte {
+	return pub[1:]
+}
+
+// Raw return the raw bytes of the private key without the 1-byte key type prefix.
+//
+// The returned byte slice is not safe to modify because it returns the underlying byte slice
+// directly for the performance reason. Copy it if you need to modify.
+func (priv TypedPrivateKey) Raw() []byte {
+	return priv[1:]
 }
