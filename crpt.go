@@ -14,14 +14,23 @@ import (
 type KeyType uint8
 
 const (
-	Ed25519 KeyType = 1 + iota
+	Auto KeyType = iota
+	Ed25519
 	Ed25519_SHA3_512
+	// This may change as new implementations come out.
+	NumberOfAvailableImpl
 )
 
 // Passing NotHashed as hashFunc to Crpt.Sign indicates that message is not hashed
 const NotHashed crypto.Hash = 0
 
-var ErrKeyTypeNotSupported = errors.New("key type not supported")
+var (
+	ErrKeyTypeNotSupported = errors.New("key type not supported")
+	ErrUnimplemented       = errors.New("unimplemented")
+	ErrWrongPublicKeySize  = errors.New("wrong public key size")
+	ErrWrongPrivateKeySize = errors.New("wrong private key size")
+	ErrWrongSignatureSize  = errors.New("wrong signature size")
+)
 
 // PublicKey represents a public key with a specific key type.
 type PublicKey interface {
@@ -133,14 +142,23 @@ type Crpt interface {
 	// already implemented by embedded BaseCrpt.
 	HashTyped(msg []byte) TypedHash
 
-	// PublicKeyFromBytes constructs a PublicKey from bytes.
-	PublicKeyFromBytes(publicKey []byte) (PublicKey, error)
+	// PublicKeyFromBytes constructs a PublicKey from raw bytes.
+	PublicKeyFromBytes(pub []byte) (PublicKey, error)
 
-	// PrivateKeyFromBytes constructs a PrivateKey from bytes.
-	PrivateKeyFromBytes(privateKey []byte) (PrivateKey, error)
+	// PublicKeyFromTypedBytes constructs a PublicKey from a TypedPublicKey.
+	PublicKeyFromTypedBytes(pub TypedPublicKey) (PublicKey, error)
 
-	// SignatureFromBytes constructs a Signature from bytes.
+	// PrivateKeyFromBytes constructs a PrivateKey from raw bytes.
+	PrivateKeyFromBytes(priv []byte) (PrivateKey, error)
+
+	// PrivateKeyFromTypedBytes constructs a PrivateKey from TypedPrivateKey.
+	PrivateKeyFromTypedBytes(priv TypedPrivateKey) (PrivateKey, error)
+
+	// SignatureFromBytes constructs a Signature from raw bytes.
 	SignatureFromBytes(sig []byte) (Signature, error)
+
+	// SignatureFromTypedBytes constructs a Signature from TypedSignature.
+	SignatureFromTypedBytes(sig TypedSignature) (Signature, error)
 
 	// GenerateKey generates a public/private key pair using entropy from rand.
 	GenerateKey(rand io.Reader) (PublicKey, PrivateKey, error)
@@ -157,9 +175,9 @@ type Crpt interface {
 	//
 	// Crpt implementations generally don't need to implement this method as it is
 	// already implemented by embedded BaseCrpt.
-	Sign(privateKey PrivateKey, message, digest []byte, hashFunc crypto.Hash, rand io.Reader) (Signature, error)
+	Sign(priv PrivateKey, message, digest []byte, hashFunc crypto.Hash, rand io.Reader) (Signature, error)
 
-	// SignMessage directly signs message with privateKey, or hashes message first
+	// SignMessage directly signs message with `priv`, or hashes message first
 	// and signs the resulting digest and returns a Signature, possibly using entropy
 	// from rand.
 	//
@@ -168,17 +186,17 @@ type Crpt interface {
 	// cases, the Crpt implementations are not appropriate for signing the pre-hashed messages.
 	// For example, Ed25519 performs two passes over messages to be signed and therefore cannot
 	// handle pre-hashed messages, so it will directly signs the message.
-	SignMessage(privateKey PrivateKey, message []byte, rand io.Reader) (Signature, error)
+	SignMessage(priv PrivateKey, message []byte, rand io.Reader) (Signature, error)
 
-	// SignDigest signs digest with privateKey and returns a Signature, possibly
+	// SignDigest signs digest with `priv` and returns a Signature, possibly
 	// using entropy from rand.
 	//
 	// The caller must hash the message and pass the hash (as digest) and the hash
 	// function used (as hashFunc) to SignDigest.
-	SignDigest(privateKey PrivateKey, digest []byte, hashFunc crypto.Hash, rand io.Reader) (Signature, error)
+	SignDigest(priv PrivateKey, digest []byte, hashFunc crypto.Hash, rand io.Reader) (Signature, error)
 
-	// Verify reports whether sig is a valid signature of message by publicKey.
-	Verify(publicKey PublicKey, message []byte, sig Signature) (bool, error)
+	// Verify reports whether sig is a valid signature of message by `pub`.
+	Verify(pub PublicKey, message []byte, sig Signature) (bool, error)
 }
 
 // Raw return the raw bytes of the public key without the 1-byte key type prefix.

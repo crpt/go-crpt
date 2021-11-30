@@ -34,7 +34,7 @@ type BaseCrpt struct {
 	parentCrpt crpt.Crpt
 }
 
-func NewBaseCrpt(keyType crpt.KeyType, hashFunc crypto.Hash, canSignPreHashedMessages bool,
+func NewBaseCrpt(ktype crpt.KeyType, hashFunc crypto.Hash, canSignPreHashedMessages bool,
 	parentCrpt crpt.Crpt) (*BaseCrpt, error) {
 	if !hashFunc.Available() {
 		return nil, errors.New("crpt: requested hash function #" +
@@ -44,7 +44,7 @@ func NewBaseCrpt(keyType crpt.KeyType, hashFunc crypto.Hash, canSignPreHashedMes
 		panic("implementations should always pass parentCrpt")
 	}
 	return &BaseCrpt{
-		keyType:                  keyType,
+		keyType:                  ktype,
 		hashFunc:                 hashFunc,
 		hashFuncByte:             byte(hashFunc),
 		canSignPreHashedMessages: canSignPreHashedMessages,

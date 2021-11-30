@@ -18,6 +18,7 @@ import (
 	"crypto"
 	"crypto/ed25519"
 	"errors"
+	"fmt"
 	"io"
 
 	ed25519sha3 "github.com/crpt/go-ed25519-sha3-512"
@@ -43,9 +44,9 @@ var (
 	KeyTypeByte          = byte(crpt.Ed25519)
 	KeyTypeByte_SHA3_512 = byte(crpt.Ed25519_SHA3_512)
 
-	ErrWrongPublicKeySize       = errors.New("wrong Ed25519 public key size, should be 32 bytes")
-	ErrWrongPrivateKeySize      = errors.New("wrong Ed25519 private key size, should be 64 bytes")
-	ErrWrongSignatureSize       = errors.New("wrong Ed25519 signature size, should be 64 bytes")
+	ErrWrongPublicKeySize       = fmt.Errorf("%w, should be 32 bytes", crpt.ErrWrongPublicKeySize)
+	ErrWrongPrivateKeySize      = fmt.Errorf("%w, should be 64 bytes", crpt.ErrWrongPrivateKeySize)
+	ErrWrongSignatureSize       = fmt.Errorf("%w, should be 64 bytes", crpt.ErrWrongSignatureSize)
 	ErrNotEd25519PublicKey      = errors.New("not a Ed25519 public key")
 	ErrNotEd25519SHA3PublicKey  = errors.New("not a Ed25519-SHA3-512 public key")
 	ErrNotEd25519PrivateKey     = errors.New("not a Ed25519 private key")
@@ -241,6 +242,18 @@ func publicKeyFromBytes(sha3 bool, pub []byte) (crpt.PublicKey, error) {
 	}
 }
 
+func (c *ed25519Crpt) PublicKeyFromTypedBytes(pub crpt.TypedPublicKey) (crpt.PublicKey, error) {
+	if len(pub) != PublicKeySize+1 {
+		return nil, ErrWrongPublicKeySize
+	}
+
+	if c.sha3 {
+		return sha3PublicKey(pub), nil
+	} else {
+		return publicKey(pub), nil
+	}
+}
+
 func (c *ed25519Crpt) PrivateKeyFromBytes(priv []byte) (crpt.PrivateKey, error) {
 	if len(priv) != PrivateKeySize {
 		return nil, ErrWrongPrivateKeySize
@@ -254,10 +267,18 @@ func (c *ed25519Crpt) PrivateKeyFromBytes(priv []byte) (crpt.PrivateKey, error) 
 	}
 	copy(k[1:PrivateKeySize+1], priv)
 
+	return c.PrivateKeyFromTypedBytes(k)
+}
+
+func (c *ed25519Crpt) PrivateKeyFromTypedBytes(priv crpt.TypedPrivateKey) (crpt.PrivateKey, error) {
+	if len(priv) != PrivateKeySize+1 {
+		return nil, ErrWrongPrivateKeySize
+	}
+
 	if c.sha3 {
-		return sha3PrivateKey(k), nil
+		return sha3PrivateKey(priv), nil
 	} else {
-		return privateKey(k), nil
+		return privateKey(priv), nil
 	}
 }
 
@@ -274,10 +295,18 @@ func (c *ed25519Crpt) SignatureFromBytes(sig []byte) (crpt.Signature, error) {
 	}
 	copy(s[1:SignatureSize+1], sig)
 
+	return c.SignatureFromTypedBytes(s)
+}
+
+func (c *ed25519Crpt) SignatureFromTypedBytes(sig crpt.TypedSignature) (crpt.Signature, error) {
+	if len(sig) != SignatureSize+1 {
+		return nil, ErrWrongSignatureSize
+	}
+
 	if c.sha3 {
-		return sha3Signature(s), nil
+		return sha3Signature(sig), nil
 	} else {
-		return signature(s), nil
+		return signature(sig), nil
 	}
 }
 
