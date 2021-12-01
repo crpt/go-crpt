@@ -8,6 +8,7 @@ package util
 import (
 	"crypto"
 	"errors"
+	"hash"
 	"io"
 	"strconv"
 
@@ -75,6 +76,16 @@ func (c *BaseCrpt) HashTyped(b []byte) crpt.TypedHash {
 	h.Write(b)
 	s := make([]byte, 1, 65)
 	s[0] = c.hashFuncByte
+	return h.Sum(s)
+}
+
+// SumHashTyped implements crpt.SumHashTyped.
+func (c *BaseCrpt) SumHashTyped(h hash.Hash, b []byte) []byte {
+	s := make([]byte, len(b)+1, len(b)+65)
+	if len(b) > 0 {
+		copy(s, b)
+	}
+	s[len(b)] = c.hashFuncByte
 	return h.Sum(s)
 }
 

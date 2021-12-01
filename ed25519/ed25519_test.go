@@ -38,23 +38,8 @@ func TestEd25519Crpt(t *testing.T) {
 	})
 
 	t.Run("Hash", func(t *testing.T) {
-		h := c.Hash(test.TestMsg)
-		ht := c.HashTyped(test.TestMsg)
-		hash := crypto.SHA256.New()
-		hash.Write(test.TestMsg)
-		h_ := hash.Sum(nil)
-		assr.Equal(h_, h)
-		assr.Equal(byte(crypto.SHA256), ht[0])
-		assr.Equal(h_, []byte(ht[1:]))
-
-		h3 := c3.Hash(test.TestMsg)
-		h3t := c3.HashTyped(test.TestMsg)
-		hash3 := crypto.SHA3_256.New()
-		hash3.Write(test.TestMsg)
-		h3_ := hash3.Sum(nil)
-		assr.Equal(h3_, h3)
-		assr.Equal(byte(crypto.SHA3_256), h3t[0])
-		assr.Equal(h3_, []byte(h3t[1:]))
+		test.Test_Hash(t, c)
+		test.Test_Hash(t, c3)
 	})
 
 	t.Run("XxxFromBytes, SignXxx, Verify", func(t *testing.T) {

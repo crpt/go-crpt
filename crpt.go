@@ -10,6 +10,7 @@ import (
 	"crypto"
 	"errors"
 	"github.com/multiformats/go-multihash"
+	"hash"
 	"io"
 )
 
@@ -153,6 +154,11 @@ type Crpt interface {
 	// Crpt implementations generally don't need to implement this method as it is
 	// already implemented by embedded BaseCrpt.
 	HashTyped(msg []byte) TypedHash
+
+	// SumHashTyped appends the current hash of `h` in TypeHash bytes
+	// representation to`b` and returns the resulting/slice.
+	// It does not change the underlying hash state.
+	SumHashTyped(h hash.Hash, b []byte) []byte
 
 	// PublicKeyFromBytes constructs a PublicKey from raw bytes.
 	PublicKeyFromBytes(pub []byte) (PublicKey, error)

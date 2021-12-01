@@ -30,14 +30,7 @@ func TestAutoCrpt(t *testing.T) {
 	})
 
 	t.Run("Hash", func(t *testing.T) {
-		h := c.Hash(test.TestMsg)
-		ht := c.HashTyped(test.TestMsg)
-		hash := crypto.SHA256.New()
-		hash.Write(test.TestMsg)
-		h_ := hash.Sum(nil)
-		assr.Equal(h_, h)
-		assr.Equal(byte(crypto.SHA256), ht[0])
-		assr.Equal(h_, []byte(ht[1:]))
+		test.Test_Hash(t, c)
 	})
 
 	t.Run("XxxFromBytes, SignXxx, Verify", func(t *testing.T) {

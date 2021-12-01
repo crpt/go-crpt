@@ -1,10 +1,11 @@
 package test
 
 import (
+	"testing"
+
 	"github.com/crpt/go-crpt"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 var (
@@ -26,6 +27,25 @@ var (
 	TestMsg                        = []byte{0x1, 0x2, 0x3, 0x4}
 	TestMsg2                       = []byte{0x1, 0x2, 0x3, 0x4, 0x5}
 )
+
+func Test_Hash(t *testing.T, c crpt.Crpt) {
+	assr := assert.New(t)
+
+	h := c.Hash(TestMsg)
+	ht := c.HashTyped(TestMsg)
+	assr.Equal(byte(c.HashFunc()), ht[0])
+	hash := c.HashFunc().New()
+	hash.Write(TestMsg)
+	h_ := hash.Sum(nil)
+	assr.Equal(h_, h)
+	assr.Equal(h_, []byte(ht[1:]))
+
+	randbin := []byte{0x1, 0x2, 0x3, 0x4}
+	hash = c.HashFunc().New()
+	hash.Write(TestMsg)
+	h_ = c.SumHashTyped(hash, randbin)
+	assr.Equal(h_[len(randbin)+1:], h)
+}
 
 func Test_PrivateKey_PublicKey(t *testing.T, c crpt.Crpt) {
 	req := require.New(t)
