@@ -74,14 +74,14 @@ func (c *BaseCrpt) Hash(b []byte) []byte {
 func (c *BaseCrpt) HashTyped(b []byte) crpt.TypedHash {
 	h := c.hashFunc.New()
 	h.Write(b)
-	s := make([]byte, 1, 65)
+	s := make([]byte, 1, h.Size()+1)
 	s[0] = c.hashFuncByte
 	return h.Sum(s)
 }
 
 // SumHashTyped implements crpt.SumHashTyped.
 func (c *BaseCrpt) SumHashTyped(h hash.Hash, b []byte) []byte {
-	s := make([]byte, len(b)+1, len(b)+65)
+	s := make([]byte, len(b)+1, len(b)+h.Size()+1)
 	if len(b) > 0 {
 		copy(s, b)
 	}
