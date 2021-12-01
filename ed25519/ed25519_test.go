@@ -6,7 +6,7 @@ package ed25519_test
 
 import (
 	"crypto"
-	"github.com/crpt/go-crpt/test"
+	"github.com/crpt/go-crpt/internal/test"
 	"testing"
 
 	"github.com/stretchr/testify/assert"

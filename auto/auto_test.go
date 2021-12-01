@@ -7,7 +7,7 @@ package auto_test
 import (
 	"crypto"
 	"github.com/crpt/go-crpt/ed25519"
-	"github.com/crpt/go-crpt/test"
+	"github.com/crpt/go-crpt/internal/test"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
