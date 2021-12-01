@@ -15,6 +15,7 @@
 package ed25519
 
 import (
+	"bytes"
 	"crypto"
 	"crypto/ed25519"
 	"errors"
@@ -81,6 +82,13 @@ func (pub sha3PublicKey) KeyType() crpt.KeyType {
 	return crpt.Ed25519_SHA3_512
 }
 
+func (pub publicKey) Equal(o crpt.PublicKey) bool {
+	return bytes.Compare(pub, o.TypedBytes()) == 0
+}
+func (pub sha3PublicKey) Equal(o crpt.PublicKey) bool {
+	return bytes.Compare(pub, o.TypedBytes()) == 0
+}
+
 // Bytes's returned byte slice is not safe to modify because it returns the underlying byte slice
 // directly for the performance reason. Copy it if you need to modify.
 func (pub publicKey) Bytes() []byte {
@@ -130,6 +138,13 @@ func (priv sha3PrivateKey) KeyType() crpt.KeyType {
 	return crpt.Ed25519_SHA3_512
 }
 
+func (priv privateKey) Equal(o crpt.PrivateKey) bool {
+	return bytes.Compare(priv, o.TypedBytes()) == 0
+}
+func (priv sha3PrivateKey) Equal(o crpt.PrivateKey) bool {
+	return bytes.Compare(priv, o.TypedBytes()) == 0
+}
+
 // Bytes's returned byte slice is not safe to modify because it returns the underlying byte slice
 // directly for the performance reason. Copy it if you need to modify.
 func (priv privateKey) Bytes() []byte {
@@ -168,6 +183,13 @@ func (s signature) KeyType() crpt.KeyType {
 }
 func (s sha3Signature) KeyType() crpt.KeyType {
 	return crpt.Ed25519_SHA3_512
+}
+
+func (sig signature) Equal(o crpt.Signature) bool {
+	return bytes.Compare(sig, o.TypedBytes()) == 0
+}
+func (sig sha3Signature) Equal(o crpt.Signature) bool {
+	return bytes.Compare(sig, o.TypedBytes()) == 0
 }
 
 // Bytes's returned byte slice is not safe to modify because it returns the underlying byte slice

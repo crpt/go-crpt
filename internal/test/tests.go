@@ -37,6 +37,15 @@ func Test_PrivateKey_PublicKey(t *testing.T, c crpt.Crpt) {
 	//fmt.Println(base64.StdEncoding.EncodeToString(priv.Bytes()))
 	assr.ElementsMatch(pub, pub.Address())
 	assr.Equal(pub, priv.Public())
+
+	pub2, priv2, err := c.GenerateKey(nil)
+	req.NoError(err)
+	assr.True(pub.Equal(pub))
+	assr.False(pub.Equal(pub2))
+	assr.False(pub2.Equal(pub))
+	assr.True(priv.Equal(priv))
+	assr.False(priv.Equal(priv2))
+	assr.False(priv2.Equal(priv))
 }
 
 func Test_XxxFromBytes_SignXxx_Verify(t *testing.T, c crpt.Crpt, privateKey []byte, fromTyped bool) {

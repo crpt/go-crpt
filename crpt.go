@@ -6,6 +6,7 @@
 package crpt
 
 import (
+	"bytes"
 	"crypto"
 	"errors"
 	"github.com/multiformats/go-multihash"
@@ -39,6 +40,9 @@ type PublicKey interface {
 	// KeyType returns the key type.
 	KeyType() KeyType
 
+	// Equal reports whether this key is equal to another key.
+	Equal(PublicKey) bool
+
 	// Bytes returns the bytes representation of the public key.
 	//
 	// NOTE: It's not safe to modify the returned slice because the implementations most likely
@@ -63,6 +67,9 @@ type PrivateKey interface {
 	// KeyType returns the key type.
 	KeyType() KeyType
 
+	// Equal reports whether this key is equal to another key.
+	Equal(PrivateKey) bool
+
 	// Bytes returns the bytes representation of the private key.
 	//
 	// NOTE: It's not safe to modify the returned slice because the implementations most likely
@@ -86,6 +93,9 @@ type PrivateKey interface {
 type Signature interface {
 	// KeyType returns the key type used to compute the signature.
 	KeyType() KeyType
+
+	// Equal reports whether this signature is equal to another signature.
+	Equal(Signature) bool
 
 	// Bytes returns the bytes representation of the signature.
 	//
@@ -201,12 +211,22 @@ type Crpt interface {
 	Verify(pub PublicKey, message []byte, sig Signature) (bool, error)
 }
 
+// Equal reports whether this key is equal to another key.
+func (pub TypedPublicKey) Equal(o TypedPublicKey) bool {
+	return bytes.Compare(pub, o) == 0
+}
+
 // Raw return the raw bytes of the public key without the 1-byte key type prefix.
 //
 // The returned byte slice is not safe to modify because it returns the underlying byte slice
 // directly for the performance reason. Copy it if you need to modify.
 func (pub TypedPublicKey) Raw() []byte {
 	return pub[1:]
+}
+
+// Equal reports whether this key is equal to another key.
+func (priv TypedPrivateKey) Equal(o TypedPrivateKey) bool {
+	return bytes.Compare(priv, o) == 0
 }
 
 // Raw return the raw bytes of the private key without the 1-byte key type prefix.
@@ -217,18 +237,23 @@ func (priv TypedPrivateKey) Raw() []byte {
 	return priv[1:]
 }
 
+// Equal reports whether this hash is equal to another hash.
+func (h TypedHash) Equal(o TypedHash) bool {
+	return bytes.Compare(h, o) == 0
+}
+
 // Raw return the raw bytes of the hash without the 1-byte key type prefix.
 //
 // The returned byte slice is not safe to modify because it returns the underlying byte slice
 // directly for the performance reason. Copy it if you need to modify.
-func (hash TypedHash) Raw() []byte {
-	return hash[1:]
+func (h TypedHash) Raw() []byte {
+	return h[1:]
 }
 
-func (hash TypedHash) Multihash() (multihash.Multihash, error) {
-	if h := hash[0]; h > 0 && int(h) < len(CryptoHashToMulticodec) {
-		code := CryptoHashToMulticodec[h]
-		return multihash.Encode(hash[1:], code)
+func (h TypedHash) Multihash() (multihash.Multihash, error) {
+	if c := h[0]; c > 0 && int(c) < len(CryptoHashToMulticodec) {
+		code := CryptoHashToMulticodec[c]
+		return multihash.Encode(h[1:], code)
 	}
 	return nil, ErrNoMatchingMultihash
 }
