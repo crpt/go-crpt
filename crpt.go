@@ -8,6 +8,7 @@ package crpt
 import (
 	"crypto"
 	"errors"
+	"github.com/multiformats/go-multihash"
 	"io"
 )
 
@@ -30,6 +31,7 @@ var (
 	ErrWrongPublicKeySize  = errors.New("wrong public key size")
 	ErrWrongPrivateKeySize = errors.New("wrong private key size")
 	ErrWrongSignatureSize  = errors.New("wrong signature size")
+	ErrNoMatchingMultihash = errors.New("no matching multihash exists")
 )
 
 // PublicKey represents a public key with a specific key type.
@@ -213,4 +215,20 @@ func (pub TypedPublicKey) Raw() []byte {
 // directly for the performance reason. Copy it if you need to modify.
 func (priv TypedPrivateKey) Raw() []byte {
 	return priv[1:]
+}
+
+// Raw return the raw bytes of the hash without the 1-byte key type prefix.
+//
+// The returned byte slice is not safe to modify because it returns the underlying byte slice
+// directly for the performance reason. Copy it if you need to modify.
+func (hash TypedHash) Raw() []byte {
+	return hash[1:]
+}
+
+func (hash TypedHash) Multihash() (multihash.Multihash, error) {
+	if h := hash[0]; h > 0 && int(h) < len(CryptoHashToMulticodec) {
+		code := CryptoHashToMulticodec[h]
+		return multihash.Encode(hash[1:], code)
+	}
+	return nil, ErrNoMatchingMultihash
 }
