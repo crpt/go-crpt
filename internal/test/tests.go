@@ -69,53 +69,83 @@ func Test_PrivateKey_PublicKey(t *testing.T, c crpt.Crpt) {
 	assr.False(priv2.Equal(priv))
 }
 
-func Test_XxxFromBytes_SignXxx_Verify(t *testing.T, c crpt.Crpt, privateKey []byte /*, fromTyped bool*/) {
+func Test_XxxFromBytes_SignXxx_Verify(t *testing.T, c crpt.Crpt, privateKey []byte, kt crpt.KeyType) {
 	req := require.New(t)
 	assr := assert.New(t)
 
 	var priv crpt.PrivateKey
 	var err error
-	//if fromTyped {
-	//	priv, err = c.PrivateKeyFromTypedBytes(privateKey)
-	//} else {
-	priv, err = c.PrivateKeyFromBytes(privateKey)
-	//}
+	if c != nil {
+		priv, err = c.PrivateKeyFromBytes(privateKey)
+	} else {
+		priv, err = crpt.PrivateKeyFromTypedBytes(privateKey)
+	}
 	req.NoError(err)
 
-	//if fromTyped {
-	//	_, err = c.PrivateKeyFromTypedBytes(TestWrongData)
-	//} else {
-	_, err = c.PrivateKeyFromBytes(TestWrongData)
-	//}
+	if c != nil {
+		_, err = c.PrivateKeyFromBytes(TestWrongData)
+	} else {
+		_, err = crpt.PrivateKeyFromTypedBytes(TestWrongData)
+	}
 	assr.ErrorIs(err, crpt.ErrWrongPrivateKeySize)
 
-	//if !fromTyped {
-	_, err = c.PublicKeyFromBytes(TestWrongData)
+	if c != nil {
+		_, err = c.PublicKeyFromBytes(TestWrongData)
+	} else {
+		_, err = crpt.PublicKeyFromBytes(kt, TestWrongData)
+	}
 	assr.ErrorIs(err, crpt.ErrWrongPublicKeySize)
-	//}
 
-	//if !fromTyped {
-	_, err = c.SignatureFromBytes(TestWrongData)
+	if c != nil {
+		_, err = c.SignatureFromBytes(TestWrongData)
+	} else {
+		_, err = crpt.SignatureFromBytes(kt, TestWrongData)
+	}
 	assr.ErrorIs(err, crpt.ErrWrongSignatureSize)
-	//}
 
-	sig, err := c.Sign(priv, TestMsg, nil, crpt.NotHashed, nil)
-	req.NoError(err)
-	sig2, err := c.Sign(priv, TestMsg2, nil, crpt.NotHashed, nil)
-	req.NoError(err)
+	var sig, sig2, sig_ crpt.Signature
+	if c != nil {
+		sig, err = c.Sign(priv, TestMsg, nil, crpt.NotHashed, nil)
+		req.NoError(err)
+		sig2, err = c.Sign(priv, TestMsg2, nil, crpt.NotHashed, nil)
+		req.NoError(err)
+	} else {
+		sig, err = crpt.Sign(kt, priv, TestMsg, nil, crpt.NotHashed, nil)
+		req.NoError(err)
+		sig2, err = crpt.Sign(kt, priv, TestMsg2, nil, crpt.NotHashed, nil)
+		req.NoError(err)
+	}
 
-	sig_, err := c.SignMessage(priv, TestMsg, nil)
+	if c != nil {
+		sig_, err = c.SignMessage(priv, TestMsg, nil)
+	} else {
+		sig_, err = crpt.SignMessage(kt, priv, TestMsg, nil)
+	}
 	req.NoError(err)
 	assr.Equal(sig, sig_)
 
-	assr.Panics(func() { c.SignDigest(priv, TestMsg, crpt.NotHashed, nil) },
-		"calling SignDigest should panic")
+	assr.Panics(func() {
+		if c != nil {
+			c.SignDigest(priv, TestMsg, crpt.NotHashed, nil)
+		} else {
+			crpt.SignDigest(kt, priv, TestMsg, crpt.NotHashed, nil)
+		}
+	}, "calling SignDigest with crpt.NotHashed should panic")
 
 	pub := priv.Public()
-	ok, err := c.Verify(pub, TestMsg, sig)
+	var ok bool
+	if c != nil {
+		ok, err = c.Verify(pub, TestMsg, sig)
+	} else {
+		ok, err = crpt.Verify(kt, pub, TestMsg, sig)
+	}
 	assr.NoError(err)
 	assr.True(ok)
-	ok, err = c.Verify(pub, TestMsg, sig2)
+	if c != nil {
+		ok, err = c.Verify(pub, TestMsg, sig2)
+	} else {
+		ok, err = crpt.Verify(kt, pub, TestMsg, sig2)
+	}
 	assr.NoError(err)
 	assr.False(ok)
 }

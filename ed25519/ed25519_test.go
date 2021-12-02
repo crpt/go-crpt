@@ -43,8 +43,8 @@ func TestEd25519Crpt(t *testing.T) {
 	})
 
 	t.Run("XxxFromBytes, SignXxx, Verify", func(t *testing.T) {
-		test.Test_XxxFromBytes_SignXxx_Verify(t, c, test.TestEd25519PrivateKey)
-		test.Test_XxxFromBytes_SignXxx_Verify(t, c3, test.TestEd25519SHA3PrivateKey)
+		test.Test_XxxFromBytes_SignXxx_Verify(t, c, test.TestEd25519PrivateKey, crpt.Ed25519)
+		test.Test_XxxFromBytes_SignXxx_Verify(t, c3, test.TestEd25519SHA3PrivateKey, crpt.Ed25519_SHA3_512)
 
 		priv, err := c.PrivateKeyFromBytes(test.TestEd25519PrivateKey)
 		req.NoError(err)

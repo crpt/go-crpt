@@ -17,24 +17,28 @@ import (
 type KeyType uint8
 
 const (
-	Auto KeyType = iota
-	Ed25519
+	Ed25519 KeyType = 1 + iota
 	Ed25519_SHA3_512
 	// This may change as new implementations come out.
-	NumberOfAvailableImpl
+	MaxCrpt
 )
+
+// Available reports whether the given KeyType implementation is available.
+func (t KeyType) Avaliable() bool {
+	return t < MaxCrpt && crpts[t] != nil
+}
 
 // Passing NotHashed as hashFunc to Crpt.Sign indicates that message is not hashed
 const NotHashed crypto.Hash = 0
 
 var (
-	ErrKeyTypeNotSupported  = errors.New("key type not supported")
-	ErrUnimplemented        = errors.New("unimplemented")
-	ErrWrongPublicKeySize   = errors.New("wrong public key size")
-	ErrWrongPrivateKeySize  = errors.New("wrong private key size")
-	ErrWrongSignatureSize   = errors.New("wrong signature size")
-	ErrNoMatchingCryptoHash = errors.New("no matching crypto.Hash exists")
-	ErrNoMatchingMultihash  = errors.New("no matching multihash exists")
+	ErrKeyTypeNotSupported          = errors.New("key type not supported")
+	ErrWrongPublicKeySize           = errors.New("wrong public key size")
+	ErrWrongPrivateKeySize          = errors.New("wrong private key size")
+	ErrWrongSignatureSize           = errors.New("wrong signature size")
+	ErrMessageAndDigestAreBothEmpty = errors.New("message and digest are both empty")
+	ErrNoMatchingCryptoHash         = errors.New("no matching crypto.Hash exists")
+	//ErrNoMatchingMultihash  = errors.New("no matching multihash exists")
 )
 
 // PublicKey represents a public key with a specific key type.
@@ -209,6 +213,18 @@ type Crpt interface {
 	Verify(pub PublicKey, message []byte, sig Signature) (bool, error)
 }
 
+var crpts = make([]Crpt, MaxCrpt)
+
+// RegisterCrpt registers a function that returns a new instance of the given
+// Crpt instance. This is intended to be called from the init function in
+// packages that implement Crpt interface.
+func RegisterCrpt(t KeyType, c Crpt) {
+	if t >= MaxCrpt {
+		panic("crypto: RegisterCrpt of unknown Crpt implementation")
+	}
+	crpts[t] = c
+}
+
 // Equal reports whether this key is equal to another key.
 func (pub TypedPublicKey) Equal(o TypedPublicKey) bool {
 	return bytes.Compare(pub, o) == 0
@@ -251,4 +267,71 @@ func TypedHashFromMultihash(mh multihash.Multihash) (TypedHash, error) {
 		decoded.Digest[0] = byte(h)
 		return decoded.Digest, nil
 	}
+}
+
+func PublicKeyFromBytes(t KeyType, pub []byte) (PublicKey, error) {
+	if t >= MaxCrpt || crpts[t] == nil {
+		return nil, ErrKeyTypeNotSupported
+	}
+	return crpts[t].PublicKeyFromBytes(pub)
+}
+
+func PublicKeyFromTypedBytes(pub TypedPublicKey) (PublicKey, error) {
+	return PublicKeyFromBytes(KeyType(pub[0]), pub[1:])
+}
+
+func PrivateKeyFromBytes(t KeyType, priv []byte) (PrivateKey, error) {
+	if !t.Avaliable() {
+		return nil, ErrKeyTypeNotSupported
+	}
+	return crpts[t].PrivateKeyFromBytes(priv)
+}
+
+func PrivateKeyFromTypedBytes(priv TypedPrivateKey) (PrivateKey, error) {
+	return PrivateKeyFromBytes(KeyType(priv[0]), priv[1:])
+}
+
+func SignatureFromBytes(t KeyType, sig []byte) (Signature, error) {
+	if !t.Avaliable() {
+		return nil, ErrKeyTypeNotSupported
+	}
+	return crpts[t].SignatureFromBytes(sig)
+}
+
+func GenerateKey(t KeyType, rand io.Reader) (PublicKey, PrivateKey, error) {
+	if !t.Avaliable() {
+		return nil, nil, ErrKeyTypeNotSupported
+	}
+	return crpts[t].GenerateKey(rand)
+}
+
+func Sign(t KeyType, priv PrivateKey, message, digest []byte, hashFunc crypto.Hash, rand io.Reader,
+) (Signature, error) {
+	if !t.Avaliable() {
+		return nil, ErrKeyTypeNotSupported
+	}
+	return crpts[t].Sign(priv, message, digest, hashFunc, rand)
+}
+
+func SignMessage(t KeyType, priv PrivateKey, message []byte, rand io.Reader,
+) (Signature, error) {
+	if !t.Avaliable() {
+		return nil, ErrKeyTypeNotSupported
+	}
+	return crpts[t].SignMessage(priv, message, rand)
+}
+
+func SignDigest(t KeyType, priv PrivateKey, digest []byte, hashFunc crypto.Hash, rand io.Reader,
+) (Signature, error) {
+	if !t.Avaliable() {
+		return nil, ErrKeyTypeNotSupported
+	}
+	return crpts[t].SignDigest(priv, digest, hashFunc, rand)
+}
+
+func Verify(t KeyType, pub PublicKey, message []byte, sig Signature) (bool, error) {
+	if !t.Avaliable() {
+		return false, ErrKeyTypeNotSupported
+	}
+	return crpts[t].Verify(pub, message, sig)
 }

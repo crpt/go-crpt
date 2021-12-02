@@ -30,6 +30,13 @@ import (
 	"github.com/crpt/go-crpt/internal/util"
 )
 
+func init() {
+	c, _ := New(false, 0)
+	crpt.RegisterCrpt(crpt.Ed25519, c)
+	c, _ = New(true, 0)
+	crpt.RegisterCrpt(crpt.Ed25519_SHA3_512, c)
+}
+
 const (
 	// 32
 	PublicKeySize = ed25519.PublicKeySize

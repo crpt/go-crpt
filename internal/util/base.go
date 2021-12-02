@@ -7,7 +7,6 @@ package util
 
 import (
 	"crypto"
-	"errors"
 	"hash"
 	"io"
 	"strconv"
@@ -35,17 +34,16 @@ type BaseCrpt struct {
 	parentCrpt crpt.Crpt
 }
 
-func NewBaseCrpt(ktype crpt.KeyType, hashFunc crypto.Hash, canSignPreHashedMessages bool,
+func NewBaseCrpt(t crpt.KeyType, hashFunc crypto.Hash, canSignPreHashedMessages bool,
 	parentCrpt crpt.Crpt) (*BaseCrpt, error) {
-	if !hashFunc.Available() {
-		return nil, errors.New("crpt: requested hash function #" +
-			strconv.Itoa(int(hashFunc)) + " is unavailable")
+	if hashFunc != 0 && !hashFunc.Available() {
+		panic("crypto: requested hash function #" + strconv.Itoa(int(hashFunc)) + " is unavailable")
 	}
 	if parentCrpt == nil {
 		panic("implementations should always pass parentCrpt")
 	}
 	return &BaseCrpt{
-		keyType:                  ktype,
+		keyType:                  t,
 		hashFunc:                 hashFunc,
 		hashFuncByte:             byte(hashFunc),
 		canSignPreHashedMessages: canSignPreHashedMessages,
@@ -65,18 +63,25 @@ func (c *BaseCrpt) HashFunc() crypto.Hash {
 
 // Hash implements Crpt.Hash using BaseCrpt.hashFunc.
 func (c *BaseCrpt) Hash(b []byte) []byte {
-	h := c.hashFunc.New()
+	h := c.newHashFunc()
 	h.Write(b)
 	return h.Sum(nil)
 }
 
 // Hash implements Crpt.Hash using BaseCrpt.hashFunc.
 func (c *BaseCrpt) HashTyped(b []byte) crpt.TypedHash {
-	h := c.hashFunc.New()
+	h := c.newHashFunc()
 	h.Write(b)
 	s := h.Sum(nil)
 	s[0] = c.hashFuncByte
 	return s
+}
+
+func (c *BaseCrpt) newHashFunc() hash.Hash {
+	if !c.hashFunc.Available() {
+		panic("crpt: hash function is not set")
+	}
+	return c.hashFunc.New()
 }
 
 // SumHashTyped implements crpt.SumHashTyped.
@@ -86,16 +91,14 @@ func (c *BaseCrpt) SumHashTyped(h hash.Hash, b []byte) []byte {
 	return s
 }
 
-var ErrMessageAndDigestAreBothEmpty = errors.New("message and digest are both empty")
-
 // Sign implements Crpt.Sign, see Crpt.Sign for details.
-func (c *BaseCrpt) Sign(privateKey crpt.PrivateKey, message, digest []byte,
-	hashFunc crypto.Hash, rand io.Reader) (crpt.Signature, error) {
+func (c *BaseCrpt) Sign(priv crpt.PrivateKey, message, digest []byte, hashFunc crypto.Hash, rand io.Reader,
+) (crpt.Signature, error) {
 	if len(digest) > 0 && c.canSignPreHashedMessages {
-		return c.parentCrpt.SignDigest(privateKey, digest, hashFunc, rand)
+		return c.parentCrpt.SignDigest(priv, digest, hashFunc, rand)
 	} else if len(message) > 0 {
-		return c.parentCrpt.SignMessage(privateKey, message, rand)
+		return c.parentCrpt.SignMessage(priv, message, rand)
 	} else {
-		return nil, ErrMessageAndDigestAreBothEmpty
+		return nil, crpt.ErrMessageAndDigestAreBothEmpty
 	}
 }

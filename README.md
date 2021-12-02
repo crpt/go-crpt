@@ -10,11 +10,6 @@ See [godoc](https://pkg.go.dev/github.com/crpt/go-crpt).
 
 ## Currently available implementations:
 
-## [auto](./auto/auto.go)
-
-Package `auto` provides an implementation that automatically detects the types of public/private keys
-or signatures and use corresponding `Crpt` implementations for crypto operations.
-
 ## [ed25519](./ed25519/ed25519.go)
 
 Package `ed25519` provides an Ed25519 implementation backed by [crypto/ed25519](https://pkg.go.dev/crypto/ed25519) std package,
