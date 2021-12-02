@@ -28,12 +28,13 @@ const (
 const NotHashed crypto.Hash = 0
 
 var (
-	ErrKeyTypeNotSupported = errors.New("key type not supported")
-	ErrUnimplemented       = errors.New("unimplemented")
-	ErrWrongPublicKeySize  = errors.New("wrong public key size")
-	ErrWrongPrivateKeySize = errors.New("wrong private key size")
-	ErrWrongSignatureSize  = errors.New("wrong signature size")
-	ErrNoMatchingMultihash = errors.New("no matching multihash exists")
+	ErrKeyTypeNotSupported  = errors.New("key type not supported")
+	ErrUnimplemented        = errors.New("unimplemented")
+	ErrWrongPublicKeySize   = errors.New("wrong public key size")
+	ErrWrongPrivateKeySize  = errors.New("wrong private key size")
+	ErrWrongSignatureSize   = errors.New("wrong signature size")
+	ErrNoMatchingCryptoHash = errors.New("no matching crypto.Hash exists")
+	ErrNoMatchingMultihash  = errors.New("no matching multihash exists")
 )
 
 // PublicKey represents a public key with a specific key type.
@@ -124,8 +125,8 @@ type TypedSignature []byte
 // Address represents an address derived from a PublicKey.
 type Address []byte
 
-// TypedHash consists of 1-byte representation of crypto.Hash used as uint8 concatenated with
-// the bytes representation of the hash
+// TypedHash is a hash representation that replace the first byte with uint8 representation of the
+// crypto.Hash used.
 type TypedHash []byte
 
 // Crpt is the common crypto operations interface implemented by all crypto implementations.
@@ -248,18 +249,15 @@ func (h TypedHash) Equal(o TypedHash) bool {
 	return bytes.Compare(h, o) == 0
 }
 
-// Raw return the raw bytes of the hash without the 1-byte key type prefix.
-//
-// The returned byte slice is not safe to modify because it returns the underlying byte slice
-// directly for the performance reason. Copy it if you need to modify.
-func (h TypedHash) Raw() []byte {
-	return h[1:]
-}
-
-func (h TypedHash) Multihash() (multihash.Multihash, error) {
-	if c := h[0]; c > 0 && int(c) < len(CryptoHashToMulticodec) {
-		code := CryptoHashToMulticodec[c]
-		return multihash.Encode(h[1:], code)
+func TypedHashFromMultihash(mh multihash.Multihash) (TypedHash, error) {
+	decoded, err := multihash.Decode(mh)
+	if err != nil {
+		return nil, err
 	}
-	return nil, ErrNoMatchingMultihash
+	if h, ok := MulticodecToCryptoHash[decoded.Code]; !ok {
+		return nil, ErrNoMatchingCryptoHash
+	} else {
+		decoded.Digest[0] = byte(h)
+		return decoded.Digest, nil
+	}
 }

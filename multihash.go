@@ -1,5 +1,11 @@
 package crpt
 
+import (
+	"crypto"
+
+	"github.com/multiformats/go-multihash"
+)
+
 // CryptoHashToMulticodec is the mapping from `crypto.Hash` to `multicodec`
 // See: https://github.com/multiformats/multicodec/blob/master/table.csv
 var CryptoHashToMulticodec = []uint64{
@@ -23,4 +29,17 @@ var CryptoHashToMulticodec = []uint64{
 	0xb220, // BLAKE2b_256                 // import golang.org/x/crypto/blake2b
 	0xb230, // BLAKE2b_384                 // import golang.org/x/crypto/blake2b
 	0xb240, // BLAKE2b_512                 // import golang.org/x/crypto/blake2b
+}
+
+// MulticodecToCryptoHash is the mapping from `multicodec` to `crypto.Hash`
+// See: https://github.com/multiformats/multicodec/blob/master/table.csv
+var MulticodecToCryptoHash = map[uint64]crypto.Hash{
+	multihash.SHA1:     crypto.SHA1,
+	multihash.SHA2_256: crypto.SHA256,
+	multihash.SHA2_512: crypto.SHA512,
+	multihash.SHA3_224: crypto.SHA224,
+	multihash.SHA3_256: crypto.SHA3_256,
+	multihash.SHA3_384: crypto.SHA3_384,
+	multihash.SHA3_512: crypto.SHA3_512,
+	multihash.MD5:      crypto.MD5,
 }

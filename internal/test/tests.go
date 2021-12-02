@@ -38,13 +38,14 @@ func Test_Hash(t *testing.T, c crpt.Crpt) {
 	hash.Write(TestMsg)
 	h_ := hash.Sum(nil)
 	assr.Equal(h_, h)
-	assr.Equal(h_, []byte(ht[1:]))
+	assr.Equal(h_[1:], []byte(ht[1:]))
 
 	randbin := []byte{0x1, 0x2, 0x3, 0x4}
 	hash = c.HashFunc().New()
 	hash.Write(TestMsg)
 	h_ = c.SumHashTyped(hash, randbin)
-	assr.Equal(h_[len(randbin)+1:], h)
+	assr.Equal(byte(c.HashFunc()), h_[len(randbin)])
+	assr.Equal(h_[len(randbin)+1:], h[1:])
 }
 
 func Test_PrivateKey_PublicKey(t *testing.T, c crpt.Crpt) {
