@@ -11,6 +11,8 @@ import (
 	"io"
 	"strconv"
 
+	"github.com/crpt/go-merkle"
+
 	"github.com/crpt/go-crpt"
 )
 
@@ -51,6 +53,13 @@ func NewBaseCrpt(t crpt.KeyType, hashFunc crypto.Hash, canSignPreHashedMessages 
 	}, nil
 }
 
+func (c *BaseCrpt) checkHashFunc() crypto.Hash {
+	if !c.hashFunc.Available() {
+		panic("crpt: hash function is not set")
+	}
+	return c.hashFunc
+}
+
 // KeyType implements crpt.KeyType.
 func (c *BaseCrpt) KeyType() crpt.KeyType {
 	return c.keyType
@@ -63,25 +72,18 @@ func (c *BaseCrpt) HashFunc() crypto.Hash {
 
 // Hash implements Crpt.Hash using BaseCrpt.hashFunc.
 func (c *BaseCrpt) Hash(b []byte) []byte {
-	h := c.newHashFunc()
+	h := c.checkHashFunc().New()
 	h.Write(b)
 	return h.Sum(nil)
 }
 
 // Hash implements Crpt.Hash using BaseCrpt.hashFunc.
 func (c *BaseCrpt) HashTyped(b []byte) crpt.TypedHash {
-	h := c.newHashFunc()
+	h := c.checkHashFunc().New()
 	h.Write(b)
 	s := h.Sum(nil)
 	s[0] = c.hashFuncByte
 	return s
-}
-
-func (c *BaseCrpt) newHashFunc() hash.Hash {
-	if !c.hashFunc.Available() {
-		panic("crpt: hash function is not set")
-	}
-	return c.hashFunc.New()
 }
 
 // SumHashTyped implements crpt.SumHashTyped.
@@ -101,4 +103,32 @@ func (c *BaseCrpt) Sign(priv crpt.PrivateKey, message, digest []byte, hashFunc c
 	} else {
 		return nil, crpt.ErrMessageAndDigestAreBothEmpty
 	}
+}
+
+// Sign implements Crpt.MerkleHashFromByteSlices using `crpt/go-merkle`.
+func (c *BaseCrpt) MerkleHashFromByteSlices(items [][]byte) (rootHash []byte) {
+	h := c.checkHashFunc()
+	return merkle.HashFromByteSlicesIterative(h, items)
+}
+
+// Sign implements Crpt.MerkleHashTypedFromByteSlices using `crpt/go-merkle`.
+func (c *BaseCrpt) MerkleHashTypedFromByteSlices(items [][]byte) (rootHash crpt.TypedHash) {
+	h := c.checkHashFunc()
+	rootHash = merkle.HashFromByteSlicesIterative(h, items)
+	return
+}
+
+// Sign implements Crpt.MerkleProofsFromByteSlices using `crpt/go-merkle`.
+func (c *BaseCrpt) MerkleProofsFromByteSlices(items [][]byte,
+) (rootHash []byte, proofs []*merkle.Proof) {
+	h := c.checkHashFunc()
+	return merkle.ProofsFromByteSlices(h, items)
+}
+
+// Sign implements Crpt.MerkleProofsTypedFromByteSlices using `crpt/go-merkle`.
+func (c *BaseCrpt) MerkleProofsTypedFromByteSlices(items [][]byte,
+) (rootHash crpt.TypedHash, proofs []*merkle.Proof) {
+	h := c.checkHashFunc()
+	rootHash, proofs = merkle.ProofsFromByteSlices(h, items)
+	return rootHash, proofs
 }

@@ -9,6 +9,7 @@ import (
 	"bytes"
 	"crypto"
 	"errors"
+	"github.com/crpt/go-merkle"
 	"github.com/multiformats/go-multihash"
 	"hash"
 	"io"
@@ -211,6 +212,24 @@ type Crpt interface {
 
 	// Verify reports whether sig is a valid signature of message by `pub`.
 	Verify(pub PublicKey, message []byte, sig Signature) (bool, error)
+
+	// MerkleHashFromByteSlices computes a Merkle tree where the leaves are the byte slice,
+	// in the provided order. It follows RFC-6962.
+	MerkleHashFromByteSlices(items [][]byte) (rootHash []byte)
+
+	// MerkleHashTypedFromByteSlices computes a Merkle tree where the leaves are the byte slice,
+	// in the provided order. It follows RFC-6962.
+	// This returns the TypedHash bytes representation.
+	MerkleHashTypedFromByteSlices(items [][]byte) (rootHash TypedHash)
+
+	// MerkleProofsFromByteSlices computes inclusion proof for given items.
+	// proofs[0] is the proof for items[0].
+	MerkleProofsFromByteSlices(items [][]byte) (rootHash []byte, proofs []*merkle.Proof)
+
+	// MerkleProofsTypedFromByteSlices computes inclusion proof for given items.
+	// proofs[0] is the proof for items[0].
+	// This returns the TypedHash bytes representation.
+	MerkleProofsTypedFromByteSlices(items [][]byte) (rootHash TypedHash, proofs []*merkle.Proof)
 }
 
 var crpts = make([]Crpt, MaxCrpt)
