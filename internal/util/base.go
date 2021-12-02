@@ -115,7 +115,8 @@ func (c *BaseCrpt) MerkleHashFromByteSlices(items [][]byte) (rootHash []byte) {
 func (c *BaseCrpt) MerkleHashTypedFromByteSlices(items [][]byte) (rootHash crpt.TypedHash) {
 	h := c.checkHashFunc()
 	rootHash = merkle.HashFromByteSlicesIterative(h, items)
-	return
+	rootHash[0] = byte(h)
+	return rootHash
 }
 
 // Sign implements Crpt.MerkleProofsFromByteSlices using `crpt/go-merkle`.
@@ -130,5 +131,6 @@ func (c *BaseCrpt) MerkleProofsTypedFromByteSlices(items [][]byte,
 ) (rootHash crpt.TypedHash, proofs []*merkle.Proof) {
 	h := c.checkHashFunc()
 	rootHash, proofs = merkle.ProofsFromByteSlices(h, items)
+	rootHash[0] = byte(h)
 	return rootHash, proofs
 }
