@@ -37,8 +37,8 @@ const (
 	PrivateKeySize = ed25519.PrivateKeySize
 	// 64
 	SignatureSize = ed25519.SignatureSize
-	// 65
-	AddressSize = PublicKeySize + 1
+	// 64
+	AddressSize = PublicKeySize
 )
 
 var (
@@ -57,20 +57,17 @@ var (
 )
 
 // Ed25519 32-byte public key
-// + 1-byte key type prefix
-type publicKey crpt.TypedPublicKey
-type sha3PublicKey crpt.TypedPublicKey
+type publicKey ed25519.PublicKey
+type sha3PublicKey ed25519sha3.PublicKey
 
 // Ed25519 32-byte private key + 32-byte public key suffix = 64 bytes
-// + 1-byte key type prefix
 // See: https://pkg.go.dev/crypto/ed25519
-type privateKey crpt.TypedPrivateKey
-type sha3PrivateKey crpt.TypedPrivateKey
+type privateKey ed25519.PrivateKey
+type sha3PrivateKey ed25519sha3.PrivateKey
 
 // Ed25519 64-byte signature
-// + 1-byte key type prefix
-type signature crpt.TypedSignature
-type sha3Signature crpt.TypedSignature
+type signature []byte
+type sha3Signature []byte
 
 // Ed25519 33-byte address (the same as TypedPublicKey)
 type Address = crpt.Address
@@ -83,33 +80,39 @@ func (pub sha3PublicKey) KeyType() crpt.KeyType {
 }
 
 func (pub publicKey) Equal(o crpt.PublicKey) bool {
-	return bytes.Compare(pub, o.TypedBytes()) == 0
+	return bytes.Compare(pub, o.Bytes()) == 0
 }
 func (pub sha3PublicKey) Equal(o crpt.PublicKey) bool {
-	return bytes.Compare(pub, o.TypedBytes()) == 0
+	return bytes.Compare(pub, o.Bytes()) == 0
 }
 
 // Bytes's returned byte slice is not safe to modify because it returns the underlying byte slice
 // directly for the performance reason. Copy it if you need to modify.
 func (pub publicKey) Bytes() []byte {
-	return pub[1 : PublicKeySize+1]
+	return pub
 }
 
 // Bytes's returned byte slice is not safe to modify because it returns the underlying byte slice
 // directly for the performance reason. Copy it if you need to modify.
 func (pub sha3PublicKey) Bytes() []byte {
-	return pub[1 : PublicKeySize+1]
+	return pub
 }
 
 // TypedBytes's returned byte slice is not safe to modify because it returns the underlying
 // byte slice directly for the performance reason. Copy it if you need to modify.
 func (pub publicKey) TypedBytes() crpt.TypedPublicKey {
+	k := make([]byte, PublicKeySize+1)
+	k[0] = KeyTypeByte
+	copy(k[1:PublicKeySize+1], pub)
 	return crpt.TypedPublicKey(pub)
 }
 
 // TypedBytes's returned byte slice is not safe to modify because it returns the underlying
 // byte slice directly for the performance reason. Copy it if you need to modify.
 func (pub sha3PublicKey) TypedBytes() crpt.TypedPublicKey {
+	k := make([]byte, PublicKeySize+1)
+	k[0] = KeyTypeByte_SHA3_512
+	copy(k[1:PublicKeySize+1], pub)
 	return crpt.TypedPublicKey(pub)
 }
 
@@ -139,42 +142,48 @@ func (priv sha3PrivateKey) KeyType() crpt.KeyType {
 }
 
 func (priv privateKey) Equal(o crpt.PrivateKey) bool {
-	return bytes.Compare(priv, o.TypedBytes()) == 0
+	return bytes.Compare(priv, o.Bytes()) == 0
 }
 func (priv sha3PrivateKey) Equal(o crpt.PrivateKey) bool {
-	return bytes.Compare(priv, o.TypedBytes()) == 0
+	return bytes.Compare(priv, o.Bytes()) == 0
 }
 
 // Bytes's returned byte slice is not safe to modify because it returns the underlying byte slice
 // directly for the performance reason. Copy it if you need to modify.
 func (priv privateKey) Bytes() []byte {
-	return priv[1 : PrivateKeySize+1]
+	return priv
 }
 
 // Bytes's returned byte slice is not safe to modify because it returns the underlying byte slice
 // directly for the performance reason. Copy it if you need to modify.
 func (priv sha3PrivateKey) Bytes() []byte {
-	return priv[1 : PrivateKeySize+1]
+	return priv
 }
 
 // TypedBytes's returned byte slice is not safe to modify because it returns the underlying
 // byte slice directly for the performance reason. Copy it if you need to modify.
 func (priv privateKey) TypedBytes() crpt.TypedPrivateKey {
+	k := make([]byte, PrivateKeySize+1)
+	k[0] = KeyTypeByte
+	copy(k[1:PrivateKeySize+1], priv)
 	return crpt.TypedPrivateKey(priv)
 }
 
 // TypedBytes's returned byte slice is not safe to modify because it returns the underlying
 // byte slice directly for the performance reason. Copy it if you need to modify.
 func (priv sha3PrivateKey) TypedBytes() crpt.TypedPrivateKey {
+	k := make([]byte, PrivateKeySize+1)
+	k[0] = KeyTypeByte_SHA3_512
+	copy(k[1:PrivateKeySize+1], priv)
 	return crpt.TypedPrivateKey(priv)
 }
 
 func (priv privateKey) Public() crpt.PublicKey {
-	pub, _ := publicKeyFromBytes(false, ed25519.PrivateKey(priv[1:PrivateKeySize+1]).Public().(ed25519.PublicKey))
+	pub, _ := publicKeyFromBytes(false, ed25519.PrivateKey(priv).Public().(ed25519.PublicKey))
 	return pub
 }
 func (priv sha3PrivateKey) Public() crpt.PublicKey {
-	pub, _ := publicKeyFromBytes(true, ed25519sha3.PrivateKey(priv[1:PrivateKeySize+1]).Public().(ed25519sha3.PublicKey))
+	pub, _ := publicKeyFromBytes(true, ed25519sha3.PrivateKey(priv).Public().(ed25519sha3.PublicKey))
 	return pub
 }
 
@@ -186,37 +195,43 @@ func (s sha3Signature) KeyType() crpt.KeyType {
 }
 
 func (sig signature) Equal(o crpt.Signature) bool {
-	return bytes.Compare(sig, o.TypedBytes()) == 0
+	return bytes.Compare(sig, o.Bytes()) == 0
 }
 func (sig sha3Signature) Equal(o crpt.Signature) bool {
-	return bytes.Compare(sig, o.TypedBytes()) == 0
+	return bytes.Compare(sig, o.Bytes()) == 0
 }
 
 // Bytes's returned byte slice is not safe to modify because it returns the underlying byte slice
 // directly for the performance reason. Copy it if you need to modify.
 func (s signature) Bytes() []byte {
-	return s[1 : SignatureSize+1]
+	return s
 }
 
 // Bytes's returned byte slice is not safe to modify because it returns the underlying byte slice
 // directly for the performance reason. Copy it if you need to modify.
 func (s sha3Signature) Bytes() []byte {
-	return s[1 : SignatureSize+1]
+	return s
 }
 
 // TypedBytes's returned byte slice is not safe to modify because it returns the underlying
 // byte slice directly for the performance reason. Copy it if you need to modify.
 func (s signature) TypedBytes() crpt.TypedSignature {
-	return crpt.TypedSignature(s)
+	ts := make([]byte, SignatureSize+1)
+	ts[0] = KeyTypeByte
+	copy(ts[1:SignatureSize+1], ts)
+	return ts
 }
 
 // TypedBytes's returned byte slice is not safe to modify because it returns the underlying
 // byte slice directly for the performance reason. Copy it if you need to modify.
 func (s sha3Signature) TypedBytes() crpt.TypedSignature {
-	return crpt.TypedSignature(s)
+	ts := make([]byte, SignatureSize+1)
+	ts[0] = KeyTypeByte_SHA3_512
+	copy(ts[1:SignatureSize+1], ts)
+	return ts
 }
 
-// New creates a Ed225519 Crpt, if sha3 is true, it uses SHA3-512 hash function
+// New creates an Ed225519 Crpt, if sha3 is true, it uses SHA3-512 hash function
 // instead of normal SHA-512.
 func New(sha3 bool, hash crypto.Hash) (*ed25519Crpt, error) {
 	crypt := &ed25519Crpt{sha3: sha3}
@@ -248,28 +263,7 @@ func publicKeyFromBytes(sha3 bool, pub []byte) (crpt.PublicKey, error) {
 	if len(pub) != PublicKeySize {
 		return nil, ErrWrongPublicKeySize
 	}
-
-	k := make([]byte, PublicKeySize+1)
 	if sha3 {
-		k[0] = KeyTypeByte_SHA3_512
-	} else {
-		k[0] = KeyTypeByte
-	}
-	copy(k[1:PublicKeySize+1], pub)
-
-	if sha3 {
-		return sha3PublicKey(k), nil
-	} else {
-		return publicKey(k), nil
-	}
-}
-
-func (c *ed25519Crpt) PublicKeyFromTypedBytes(pub crpt.TypedPublicKey) (crpt.PublicKey, error) {
-	if len(pub) != PublicKeySize+1 {
-		return nil, ErrWrongPublicKeySize
-	}
-
-	if c.sha3 {
 		return sha3PublicKey(pub), nil
 	} else {
 		return publicKey(pub), nil
@@ -280,23 +274,6 @@ func (c *ed25519Crpt) PrivateKeyFromBytes(priv []byte) (crpt.PrivateKey, error) 
 	if len(priv) != PrivateKeySize {
 		return nil, ErrWrongPrivateKeySize
 	}
-
-	k := make([]byte, PrivateKeySize+1)
-	if c.sha3 {
-		k[0] = KeyTypeByte_SHA3_512
-	} else {
-		k[0] = KeyTypeByte
-	}
-	copy(k[1:PrivateKeySize+1], priv)
-
-	return c.PrivateKeyFromTypedBytes(k)
-}
-
-func (c *ed25519Crpt) PrivateKeyFromTypedBytes(priv crpt.TypedPrivateKey) (crpt.PrivateKey, error) {
-	if len(priv) != PrivateKeySize+1 {
-		return nil, ErrWrongPrivateKeySize
-	}
-
 	if c.sha3 {
 		return sha3PrivateKey(priv), nil
 	} else {
@@ -308,23 +285,6 @@ func (c *ed25519Crpt) SignatureFromBytes(sig []byte) (crpt.Signature, error) {
 	if len(sig) != SignatureSize {
 		return nil, ErrWrongSignatureSize
 	}
-
-	s := make([]byte, SignatureSize+1)
-	if c.sha3 {
-		s[0] = KeyTypeByte_SHA3_512
-	} else {
-		s[0] = KeyTypeByte
-	}
-	copy(s[1:SignatureSize+1], sig)
-
-	return c.SignatureFromTypedBytes(s)
-}
-
-func (c *ed25519Crpt) SignatureFromTypedBytes(sig crpt.TypedSignature) (crpt.Signature, error) {
-	if len(sig) != SignatureSize+1 {
-		return nil, ErrWrongSignatureSize
-	}
-
 	if c.sha3 {
 		return sha3Signature(sig), nil
 	} else {

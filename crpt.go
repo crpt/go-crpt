@@ -164,20 +164,11 @@ type Crpt interface {
 	// PublicKeyFromBytes constructs a PublicKey from raw bytes.
 	PublicKeyFromBytes(pub []byte) (PublicKey, error)
 
-	// PublicKeyFromTypedBytes constructs a PublicKey from a TypedPublicKey.
-	PublicKeyFromTypedBytes(pub TypedPublicKey) (PublicKey, error)
-
 	// PrivateKeyFromBytes constructs a PrivateKey from raw bytes.
 	PrivateKeyFromBytes(priv []byte) (PrivateKey, error)
 
-	// PrivateKeyFromTypedBytes constructs a PrivateKey from TypedPrivateKey.
-	PrivateKeyFromTypedBytes(priv TypedPrivateKey) (PrivateKey, error)
-
 	// SignatureFromBytes constructs a Signature from raw bytes.
 	SignatureFromBytes(sig []byte) (Signature, error)
-
-	// SignatureFromTypedBytes constructs a Signature from TypedSignature.
-	SignatureFromTypedBytes(sig TypedSignature) (Signature, error)
 
 	// GenerateKey generates a public/private key pair using entropy from rand.
 	GenerateKey(rand io.Reader) (PublicKey, PrivateKey, error)

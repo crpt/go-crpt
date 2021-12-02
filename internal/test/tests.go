@@ -69,35 +69,35 @@ func Test_PrivateKey_PublicKey(t *testing.T, c crpt.Crpt) {
 	assr.False(priv2.Equal(priv))
 }
 
-func Test_XxxFromBytes_SignXxx_Verify(t *testing.T, c crpt.Crpt, privateKey []byte, fromTyped bool) {
+func Test_XxxFromBytes_SignXxx_Verify(t *testing.T, c crpt.Crpt, privateKey []byte /*, fromTyped bool*/) {
 	req := require.New(t)
 	assr := assert.New(t)
 
 	var priv crpt.PrivateKey
 	var err error
-	if fromTyped {
-		priv, err = c.PrivateKeyFromTypedBytes(privateKey)
-	} else {
-		priv, err = c.PrivateKeyFromBytes(privateKey)
-	}
+	//if fromTyped {
+	//	priv, err = c.PrivateKeyFromTypedBytes(privateKey)
+	//} else {
+	priv, err = c.PrivateKeyFromBytes(privateKey)
+	//}
 	req.NoError(err)
 
-	if fromTyped {
-		_, err = c.PrivateKeyFromTypedBytes(TestWrongData)
-	} else {
-		_, err = c.PrivateKeyFromBytes(TestWrongData)
-	}
+	//if fromTyped {
+	//	_, err = c.PrivateKeyFromTypedBytes(TestWrongData)
+	//} else {
+	_, err = c.PrivateKeyFromBytes(TestWrongData)
+	//}
 	assr.ErrorIs(err, crpt.ErrWrongPrivateKeySize)
 
-	if !fromTyped {
-		_, err = c.PublicKeyFromBytes(TestWrongData)
-		assr.ErrorIs(err, crpt.ErrWrongPublicKeySize)
-	}
+	//if !fromTyped {
+	_, err = c.PublicKeyFromBytes(TestWrongData)
+	assr.ErrorIs(err, crpt.ErrWrongPublicKeySize)
+	//}
 
-	if !fromTyped {
-		_, err = c.SignatureFromBytes(TestWrongData)
-		assr.ErrorIs(err, crpt.ErrWrongSignatureSize)
-	}
+	//if !fromTyped {
+	_, err = c.SignatureFromBytes(TestWrongData)
+	assr.ErrorIs(err, crpt.ErrWrongSignatureSize)
+	//}
 
 	sig, err := c.Sign(priv, TestMsg, nil, crpt.NotHashed, nil)
 	req.NoError(err)

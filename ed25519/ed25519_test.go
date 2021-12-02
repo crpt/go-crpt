@@ -6,7 +6,6 @@ package ed25519_test
 
 import (
 	"crypto"
-	"github.com/crpt/go-crpt/internal/test"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -14,6 +13,7 @@ import (
 
 	"github.com/crpt/go-crpt"
 	. "github.com/crpt/go-crpt/ed25519"
+	"github.com/crpt/go-crpt/internal/test"
 )
 
 func TestEd25519Crpt(t *testing.T) {
@@ -43,8 +43,8 @@ func TestEd25519Crpt(t *testing.T) {
 	})
 
 	t.Run("XxxFromBytes, SignXxx, Verify", func(t *testing.T) {
-		test.Test_XxxFromBytes_SignXxx_Verify(t, c, test.TestEd25519PrivateKey, false)
-		test.Test_XxxFromBytes_SignXxx_Verify(t, c3, test.TestEd25519SHA3PrivateKey, false)
+		test.Test_XxxFromBytes_SignXxx_Verify(t, c, test.TestEd25519PrivateKey)
+		test.Test_XxxFromBytes_SignXxx_Verify(t, c3, test.TestEd25519SHA3PrivateKey)
 
 		priv, err := c.PrivateKeyFromBytes(test.TestEd25519PrivateKey)
 		req.NoError(err)
