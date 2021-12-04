@@ -59,8 +59,6 @@ var (
 	ErrNotEd25519SHA3PublicKey  = errors.New("not a Ed25519-SHA3-512 public key")
 	ErrNotEd25519PrivateKey     = errors.New("not a Ed25519 private key")
 	ErrNotEd25519SHA3PrivateKey = errors.New("not a Ed25519-SHA3-512 private key")
-	ErrNotEd25519Signature      = errors.New("not a Ed25519 signature")
-	ErrNotEd25519SHA3Signature  = errors.New("not a Ed25519-SHA3-512 signature")
 )
 
 // Ed25519 32-byte public key
@@ -71,10 +69,6 @@ type sha3PublicKey ed25519sha3.PublicKey
 // See: https://pkg.go.dev/crypto/ed25519
 type privateKey ed25519.PrivateKey
 type sha3PrivateKey ed25519sha3.PrivateKey
-
-// Ed25519 64-byte signature
-type signature []byte
-type sha3Signature []byte
 
 // Ed25519 33-byte address (the same as TypedPublicKey)
 type Address = crpt.Address
@@ -194,50 +188,6 @@ func (priv sha3PrivateKey) Public() crpt.PublicKey {
 	return pub
 }
 
-func (s signature) KeyType() crpt.KeyType {
-	return crpt.Ed25519
-}
-func (s sha3Signature) KeyType() crpt.KeyType {
-	return crpt.Ed25519_SHA3_512
-}
-
-func (sig signature) Equal(o crpt.Signature) bool {
-	return bytes.Compare(sig, o.Bytes()) == 0
-}
-func (sig sha3Signature) Equal(o crpt.Signature) bool {
-	return bytes.Compare(sig, o.Bytes()) == 0
-}
-
-// Bytes's returned byte slice is not safe to modify because it returns the underlying byte slice
-// directly for the performance reason. Copy it if you need to modify.
-func (s signature) Bytes() []byte {
-	return s
-}
-
-// Bytes's returned byte slice is not safe to modify because it returns the underlying byte slice
-// directly for the performance reason. Copy it if you need to modify.
-func (s sha3Signature) Bytes() []byte {
-	return s
-}
-
-// TypedBytes's returned byte slice is not safe to modify because it returns the underlying
-// byte slice directly for the performance reason. Copy it if you need to modify.
-func (s signature) TypedBytes() crpt.TypedSignature {
-	ts := make([]byte, SignatureSize+1)
-	ts[0] = KeyTypeByte
-	copy(ts[1:SignatureSize+1], ts)
-	return ts
-}
-
-// TypedBytes's returned byte slice is not safe to modify because it returns the underlying
-// byte slice directly for the performance reason. Copy it if you need to modify.
-func (s sha3Signature) TypedBytes() crpt.TypedSignature {
-	ts := make([]byte, SignatureSize+1)
-	ts[0] = KeyTypeByte_SHA3_512
-	copy(ts[1:SignatureSize+1], ts)
-	return ts
-}
-
 // New creates an Ed225519 Crpt, if sha3 is true, it uses SHA3-512 hash function
 // instead of normal SHA-512.
 func New(sha3 bool, hash crypto.Hash) (*ed25519Crpt, error) {
@@ -288,15 +238,20 @@ func (c *ed25519Crpt) PrivateKeyFromBytes(priv []byte) (crpt.PrivateKey, error) 
 	}
 }
 
-func (c *ed25519Crpt) SignatureFromBytes(sig []byte) (crpt.Signature, error) {
+// SignatureToTyped's returned byte slice is not safe to modify because it returns the underlying
+// byte slice directly for the performance reason. Copy it if you need to modify.
+func (c *ed25519Crpt) SignatureToTyped(sig crpt.Signature) (crpt.TypedSignature, error) {
 	if len(sig) != SignatureSize {
 		return nil, ErrWrongSignatureSize
 	}
+	ts := make([]byte, SignatureSize+1)
 	if c.sha3 {
-		return sha3Signature(sig), nil
+		ts[0] = KeyTypeByte_SHA3_512
 	} else {
-		return signature(sig), nil
+		ts[0] = KeyTypeByte
 	}
+	copy(ts[1:], ts)
+	return ts, nil
 }
 
 func (c *ed25519Crpt) GenerateKey(rand io.Reader,
@@ -318,23 +273,6 @@ func (c *ed25519Crpt) GenerateKey(rand io.Reader,
 
 func (c *ed25519Crpt) SignMessage(priv crpt.PrivateKey, message []byte, rand io.Reader,
 ) (crpt.Signature, error) {
-	if c.sha3 {
-		if edpriv, ok := priv.(sha3PrivateKey); ok {
-			return c.SignatureFromBytes(ed25519sha3.Sign(ed25519sha3.PrivateKey(edpriv.Bytes()), message))
-		} else {
-			return nil, ErrNotEd25519SHA3PrivateKey
-		}
-	} else {
-		if edpriv, ok := priv.(privateKey); ok {
-			return c.SignatureFromBytes(ed25519.Sign(ed25519.PrivateKey(edpriv.Bytes()), message))
-		} else {
-			return nil, ErrNotEd25519PrivateKey
-		}
-	}
-}
-
-func (c *ed25519Crpt) SignMessageToBytes(priv crpt.PrivateKey, message []byte, rand io.Reader,
-) ([]byte, error) {
 	if c.sha3 {
 		if edpriv, ok := priv.(sha3PrivateKey); ok {
 			return ed25519sha3.Sign(edpriv.Bytes(), message), nil
@@ -361,21 +299,17 @@ func (c *ed25519Crpt) Verify(pub crpt.PublicKey, message []byte, sig crpt.Signat
 	if c.sha3 {
 		if edpub, ok := pub.(sha3PublicKey); !ok {
 			return false, ErrNotEd25519SHA3PublicKey
-		} else if edsig, ok := sig.(sha3Signature); !ok {
-			return false, ErrNotEd25519SHA3Signature
 		} else {
 			// This implementation has defined criteria (ZIP 215 w/ SHA3-512) for signature validity
-			return ed25519consensus_sha3.Verify(edpub.Bytes(), message, edsig.Bytes()), nil
+			return ed25519consensus_sha3.Verify(edpub.Bytes(), message, sig), nil
 			//return ed25519sha3.Verify(ed25519sha3.PublicKey(edpub), message, sig), nil
 		}
 	} else {
 		if edpub, ok := pub.(publicKey); !ok {
 			return false, ErrNotEd25519PublicKey
-		} else if edsig, ok := sig.(signature); !ok {
-			return false, ErrNotEd25519Signature
 		} else {
 			// This implementation has defined criteria (ZIP 215) for signature validity
-			return ed25519consensus.Verify(edpub.Bytes(), message, edsig.Bytes()), nil
+			return ed25519consensus.Verify(edpub.Bytes(), message, sig), nil
 			//return ed25519.Verify(ed25519.PublicKey(edpub), message, sig), nil
 		}
 	}

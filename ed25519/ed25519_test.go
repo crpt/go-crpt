@@ -69,14 +69,14 @@ func TestEd25519Crpt(t *testing.T) {
 		assr.False(ok)
 		assr.Equal(ErrNotEd25519PublicKey, err)
 		ok, err = c.Verify(pub, test.TestMsg, sig3)
+		assr.NoError(err)
 		assr.False(ok)
-		assr.Equal(ErrNotEd25519Signature, err)
 
 		ok, err = c3.Verify(pub, test.TestMsg, sig3)
 		assr.False(ok)
 		assr.Equal(ErrNotEd25519SHA3PublicKey, err)
 		ok, err = c3.Verify(pub3, test.TestMsg, sig)
+		assr.NoError(err)
 		assr.False(ok)
-		assr.Equal(ErrNotEd25519SHA3Signature, err)
 	})
 }

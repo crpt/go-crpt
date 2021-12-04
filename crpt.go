@@ -98,25 +98,7 @@ type PrivateKey interface {
 }
 
 // Signature represents a digital signature produced by signing a message.
-type Signature interface {
-	// KeyType returns the key type used to compute the signature.
-	KeyType() KeyType
-
-	// Equal reports whether this signature is equal to another signature.
-	Equal(Signature) bool
-
-	// Bytes returns the bytes representation of the signature.
-	//
-	// NOTE: It's not safe to modify the returned slice because the implementations most likely
-	// return the underlying byte slice directly for the performance reason. Copy it if you need to modify.
-	Bytes() []byte
-
-	// TypedBytes returns the TypedSignature bytes representation of the signature.
-	//
-	// NOTE: It's not safe to modify the returned slice because the implementations most likely
-	// return the underlying byte slice directly for the performance reason. Copy it if you need to modify.
-	TypedBytes() TypedSignature
-}
+type Signature []byte
 
 // TypedPublicKey consists of 1-byte KeyType of a PublicKey concatenated with its bytes representation.
 type TypedPublicKey []byte
@@ -130,6 +112,9 @@ type TypedSignature []byte
 
 // Address represents an address derived from a PublicKey.
 type Address []byte
+
+// Hash represents a hash.
+type Hash []byte
 
 // TypedHash is a hash representation that replace the first byte with uint8 representation of the
 // crypto.Hash used.
@@ -153,7 +138,7 @@ type Crpt interface {
 	//
 	// Crpt implementations generally don't need to implement this method as it is
 	// already implemented by embedded BaseCrpt.
-	Hash(msg []byte) []byte
+	Hash(msg []byte) Hash
 
 	// HashTyped calculates the hash of msg using underlying BaseCrpt.hashFunc
 	// and return its TypedHash bytes representation.
@@ -167,14 +152,17 @@ type Crpt interface {
 	// It does not change the underlying hash state.
 	SumHashTyped(h hash.Hash, b []byte) []byte
 
+	// HashToTyped decorates a hash into a TypedHash.
+	HashToTyped(Hash) TypedHash
+
 	// PublicKeyFromBytes constructs a PublicKey from raw bytes.
 	PublicKeyFromBytes(pub []byte) (PublicKey, error)
 
 	// PrivateKeyFromBytes constructs a PrivateKey from raw bytes.
 	PrivateKeyFromBytes(priv []byte) (PrivateKey, error)
 
-	// SignatureFromBytes constructs a Signature from raw bytes.
-	SignatureFromBytes(sig []byte) (Signature, error)
+	// SignatureToTyped decorates a Signature into a TypedSignature.
+	SignatureToTyped(sig Signature) (TypedSignature, error)
 
 	// GenerateKey generates a public/private key pair using entropy from rand.
 	GenerateKey(rand io.Reader) (PublicKey, PrivateKey, error)
@@ -204,9 +192,6 @@ type Crpt interface {
 	// handle pre-hashed messages, so it will directly signs the message.
 	SignMessage(priv PrivateKey, message []byte, rand io.Reader) (Signature, error)
 
-	//SignMessageToBytes is like SignMessage, but it returns bytes of Signature
-	SignMessageToBytes(priv PrivateKey, message []byte, rand io.Reader) ([]byte, error)
-
 	// SignDigest signs digest with `priv` and returns a Signature, possibly
 	// using entropy from rand.
 	//
@@ -214,11 +199,8 @@ type Crpt interface {
 	// function used (as hashFunc) to SignDigest.
 	SignDigest(priv PrivateKey, digest []byte, hashFunc crypto.Hash, rand io.Reader) (Signature, error)
 
-	// Verify reports whether sig is a valid signature of message by `pub`.
+	// Verify reports whether `sig` is a valid signature of message by `pub`.
 	Verify(pub PublicKey, message []byte, sig Signature) (bool, error)
-
-	// VerifySigBytes is like Verify, but it uses bytes of Signature directly
-	VerifySigBytes(pub PublicKey, message []byte, sig []byte) (bool, error)
 
 	// MerkleHashFromByteSlices computes a Merkle tree where the leaves are the byte slice,
 	// in the provided order. It follows RFC-6962.
@@ -282,6 +264,14 @@ func (h TypedHash) Equal(o TypedHash) bool {
 	return bytes.Compare(h, o) == 0
 }
 
+// HashToTyped decorates a hash into a TypedHash with crypto.Hash.
+func HashToTyped(hashFunc crypto.Hash, h Hash) TypedHash {
+	ht := make([]byte, len(h))
+	ht[0] = byte(hashFunc)
+	return ht
+}
+
+// TypedHashFromMultihash turns a Multihash into a TypedHash.
 func TypedHashFromMultihash(mh multihash.Multihash) (TypedHash, error) {
 	decoded, err := multihash.Decode(mh)
 	if err != nil {
@@ -295,6 +285,7 @@ func TypedHashFromMultihash(mh multihash.Multihash) (TypedHash, error) {
 	}
 }
 
+// PublicKeyFromBytes constructs a PublicKey from raw bytes.
 func PublicKeyFromBytes(t KeyType, pub []byte) (PublicKey, error) {
 	if t >= MaxCrpt || crpts[t] == nil {
 		return nil, ErrKeyTypeNotSupported
@@ -302,10 +293,12 @@ func PublicKeyFromBytes(t KeyType, pub []byte) (PublicKey, error) {
 	return crpts[t].PublicKeyFromBytes(pub)
 }
 
+// PublicKeyFromTypedBytes constructs a PublicKey from its TypedPublicKey bytes representation.
 func PublicKeyFromTypedBytes(pub TypedPublicKey) (PublicKey, error) {
 	return PublicKeyFromBytes(KeyType(pub[0]), pub[1:])
 }
 
+// PrivateKeyFromBytes constructs a PrivateKey from raw bytes.
 func PrivateKeyFromBytes(t KeyType, priv []byte) (PrivateKey, error) {
 	if !t.Avaliable() {
 		return nil, ErrKeyTypeNotSupported
@@ -313,17 +306,20 @@ func PrivateKeyFromBytes(t KeyType, priv []byte) (PrivateKey, error) {
 	return crpts[t].PrivateKeyFromBytes(priv)
 }
 
+// PrivateKeyFromTypedBytes constructs a PrivateKey from its TypedPrivateKey bytes representation.
 func PrivateKeyFromTypedBytes(priv TypedPrivateKey) (PrivateKey, error) {
 	return PrivateKeyFromBytes(KeyType(priv[0]), priv[1:])
 }
 
-func SignatureFromBytes(t KeyType, sig []byte) (Signature, error) {
+// SignatureToTyped decorates a Signature into a TypedSignature.
+func SignatureToTyped(t KeyType, sig Signature) (TypedSignature, error) {
 	if !t.Avaliable() {
 		return nil, ErrKeyTypeNotSupported
 	}
-	return crpts[t].SignatureFromBytes(sig)
+	return crpts[t].SignatureToTyped(sig)
 }
 
+// GenerateKey generates a public/private key pair using entropy from rand.
 func GenerateKey(t KeyType, rand io.Reader) (PublicKey, PrivateKey, error) {
 	if !t.Avaliable() {
 		return nil, nil, ErrKeyTypeNotSupported
@@ -331,6 +327,18 @@ func GenerateKey(t KeyType, rand io.Reader) (PublicKey, PrivateKey, error) {
 	return crpts[t].GenerateKey(rand)
 }
 
+// Sign signs message or digest and returns a Signature, possibly using entropy
+// from rand.
+//
+// In most case, it is recommended to use Sign instead of SignMessage or SignDigest. If not
+// providing digest (nil or empty), the caller can pass NotHashed as the value for hashFunc.
+//
+// If digest is provided (not empty), and the Crpt implementation is appropriate
+// for signing the pre-hashed messages (see SignMessage for details), Sign should
+// just call SignDigest, otherwise it should just call SignMessage.
+//
+// Crpt implementations generally don't need to implement this method as it is
+// already implemented by embedded BaseCrpt.
 func Sign(t KeyType, priv PrivateKey, message, digest []byte, hashFunc crypto.Hash, rand io.Reader,
 ) (Signature, error) {
 	if !t.Avaliable() {
@@ -339,6 +347,15 @@ func Sign(t KeyType, priv PrivateKey, message, digest []byte, hashFunc crypto.Ha
 	return crpts[t].Sign(priv, message, digest, hashFunc, rand)
 }
 
+// SignMessage directly signs message with `priv`, or hashes message first
+// and signs the resulting digest and returns a Signature, possibly using entropy
+// from rand.
+//
+// Whether SignMessage signs message or its digest depends on the Crpt implementation.
+// In most case, it will hash the message first and signs the resulting digest.But in some
+// cases, the Crpt implementations are not appropriate for signing the pre-hashed messages.
+// For example, Ed25519 performs two passes over messages to be signed and therefore cannot
+// handle pre-hashed messages, so it will directly signs the message.
 func SignMessage(t KeyType, priv PrivateKey, message []byte, rand io.Reader,
 ) (Signature, error) {
 	if !t.Avaliable() {
@@ -347,6 +364,11 @@ func SignMessage(t KeyType, priv PrivateKey, message []byte, rand io.Reader,
 	return crpts[t].SignMessage(priv, message, rand)
 }
 
+// SignDigest signs digest with `priv` and returns a Signature, possibly
+// using entropy from rand.
+//
+// The caller must hash the message and pass the hash (as digest) and the hash
+// function used (as hashFunc) to SignDigest.
 func SignDigest(t KeyType, priv PrivateKey, digest []byte, hashFunc crypto.Hash, rand io.Reader,
 ) (Signature, error) {
 	if !t.Avaliable() {
@@ -355,6 +377,7 @@ func SignDigest(t KeyType, priv PrivateKey, digest []byte, hashFunc crypto.Hash,
 	return crpts[t].SignDigest(priv, digest, hashFunc, rand)
 }
 
+// Verify reports whether `sig` is a valid signature of message by `pub`.
 func Verify(t KeyType, pub PublicKey, message []byte, sig Signature) (bool, error) {
 	if !t.Avaliable() {
 		return false, ErrKeyTypeNotSupported

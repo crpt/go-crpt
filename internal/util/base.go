@@ -71,7 +71,7 @@ func (c *BaseCrpt) HashFunc() crypto.Hash {
 }
 
 // Hash implements Crpt.Hash using BaseCrpt.hashFunc.
-func (c *BaseCrpt) Hash(b []byte) []byte {
+func (c *BaseCrpt) Hash(b []byte) crpt.Hash {
 	h := c.checkHashFunc().New()
 	h.Write(b)
 	return h.Sum(nil)
@@ -91,6 +91,13 @@ func (c *BaseCrpt) SumHashTyped(h hash.Hash, b []byte) []byte {
 	s := h.Sum(b)
 	s[len(b)] = c.hashFuncByte
 	return s
+}
+
+// HashToTyped decorates a hash into a TypedHash.
+func (c *BaseCrpt) HashToTyped(h crpt.Hash) crpt.TypedHash {
+	ht := make([]byte, len(h))
+	ht[0] = c.hashFuncByte
+	return ht
 }
 
 // Sign implements Crpt.Sign, see Crpt.Sign for details.

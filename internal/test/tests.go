@@ -1,6 +1,7 @@
 package test
 
 import (
+	"bytes"
 	"testing"
 
 	"github.com/crpt/go-crpt"
@@ -37,7 +38,7 @@ func Test_Hash(t *testing.T, c crpt.Crpt) {
 	hash := c.HashFunc().New()
 	hash.Write(TestMsg)
 	h_ := hash.Sum(nil)
-	assr.Equal(h_, h)
+	assr.True(bytes.Equal(h_, h))
 	assr.Equal(h_[1:], []byte(ht[1:]))
 
 	randbin := []byte{0x1, 0x2, 0x3, 0x4}
@@ -45,7 +46,7 @@ func Test_Hash(t *testing.T, c crpt.Crpt) {
 	hash.Write(TestMsg)
 	h_ = c.SumHashTyped(hash, randbin)
 	assr.Equal(byte(c.HashFunc()), h_[len(randbin)])
-	assr.Equal(h_[len(randbin)+1:], h[1:])
+	assr.True(bytes.Equal(h_[len(randbin)+1:], h[1:]))
 }
 
 func Test_PrivateKey_PublicKey(t *testing.T, c crpt.Crpt) {
@@ -97,9 +98,9 @@ func Test_XxxFromBytes_SignXxx_Verify(t *testing.T, c crpt.Crpt, privateKey []by
 	assr.ErrorIs(err, crpt.ErrWrongPublicKeySize)
 
 	if c != nil {
-		_, err = c.SignatureFromBytes(TestWrongData)
+		_, err = c.SignatureToTyped(TestWrongData)
 	} else {
-		_, err = crpt.SignatureFromBytes(kt, TestWrongData)
+		_, err = crpt.SignatureToTyped(kt, TestWrongData)
 	}
 	assr.ErrorIs(err, crpt.ErrWrongSignatureSize)
 
