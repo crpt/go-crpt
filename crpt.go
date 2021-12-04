@@ -9,10 +9,11 @@ import (
 	"bytes"
 	"crypto"
 	"errors"
-	"github.com/crpt/go-merkle"
-	"github.com/multiformats/go-multihash"
 	"hash"
 	"io"
+
+	"github.com/crpt/go-merkle"
+	"github.com/multiformats/go-multihash"
 )
 
 type KeyType uint8
@@ -203,6 +204,9 @@ type Crpt interface {
 	// handle pre-hashed messages, so it will directly signs the message.
 	SignMessage(priv PrivateKey, message []byte, rand io.Reader) (Signature, error)
 
+	//SignMessageToBytes is like SignMessage, but it returns bytes of Signature
+	SignMessageToBytes(priv PrivateKey, message []byte, rand io.Reader) ([]byte, error)
+
 	// SignDigest signs digest with `priv` and returns a Signature, possibly
 	// using entropy from rand.
 	//
@@ -212,6 +216,9 @@ type Crpt interface {
 
 	// Verify reports whether sig is a valid signature of message by `pub`.
 	Verify(pub PublicKey, message []byte, sig Signature) (bool, error)
+
+	// VerifySigBytes is like Verify, but it uses bytes of Signature directly
+	VerifySigBytes(pub PublicKey, message []byte, sig []byte) (bool, error)
 
 	// MerkleHashFromByteSlices computes a Merkle tree where the leaves are the byte slice,
 	// in the provided order. It follows RFC-6962.
