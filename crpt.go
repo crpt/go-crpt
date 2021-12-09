@@ -26,7 +26,7 @@ const (
 )
 
 // Available reports whether the given KeyType implementation is available.
-func (t KeyType) Avaliable() bool {
+func (t KeyType) Available() bool {
 	return t < MaxCrpt && crpts[t] != nil
 }
 
@@ -300,7 +300,7 @@ func PublicKeyFromTypedBytes(pub TypedPublicKey) (PublicKey, error) {
 
 // PrivateKeyFromBytes constructs a PrivateKey from raw bytes.
 func PrivateKeyFromBytes(t KeyType, priv []byte) (PrivateKey, error) {
-	if !t.Avaliable() {
+	if !t.Available() {
 		return nil, ErrKeyTypeNotSupported
 	}
 	return crpts[t].PrivateKeyFromBytes(priv)
@@ -313,7 +313,7 @@ func PrivateKeyFromTypedBytes(priv TypedPrivateKey) (PrivateKey, error) {
 
 // SignatureToTyped decorates a Signature into a TypedSignature.
 func SignatureToTyped(t KeyType, sig Signature) (TypedSignature, error) {
-	if !t.Avaliable() {
+	if !t.Available() {
 		return nil, ErrKeyTypeNotSupported
 	}
 	return crpts[t].SignatureToTyped(sig)
@@ -321,7 +321,7 @@ func SignatureToTyped(t KeyType, sig Signature) (TypedSignature, error) {
 
 // GenerateKey generates a public/private key pair using entropy from rand.
 func GenerateKey(t KeyType, rand io.Reader) (PublicKey, PrivateKey, error) {
-	if !t.Avaliable() {
+	if !t.Available() {
 		return nil, nil, ErrKeyTypeNotSupported
 	}
 	return crpts[t].GenerateKey(rand)
@@ -341,7 +341,7 @@ func GenerateKey(t KeyType, rand io.Reader) (PublicKey, PrivateKey, error) {
 // already implemented by embedded BaseCrpt.
 func Sign(t KeyType, priv PrivateKey, message, digest []byte, hashFunc crypto.Hash, rand io.Reader,
 ) (Signature, error) {
-	if !t.Avaliable() {
+	if !t.Available() {
 		return nil, ErrKeyTypeNotSupported
 	}
 	return crpts[t].Sign(priv, message, digest, hashFunc, rand)
@@ -358,7 +358,7 @@ func Sign(t KeyType, priv PrivateKey, message, digest []byte, hashFunc crypto.Ha
 // handle pre-hashed messages, so it will directly signs the message.
 func SignMessage(t KeyType, priv PrivateKey, message []byte, rand io.Reader,
 ) (Signature, error) {
-	if !t.Avaliable() {
+	if !t.Available() {
 		return nil, ErrKeyTypeNotSupported
 	}
 	return crpts[t].SignMessage(priv, message, rand)
@@ -371,7 +371,7 @@ func SignMessage(t KeyType, priv PrivateKey, message []byte, rand io.Reader,
 // function used (as hashFunc) to SignDigest.
 func SignDigest(t KeyType, priv PrivateKey, digest []byte, hashFunc crypto.Hash, rand io.Reader,
 ) (Signature, error) {
-	if !t.Avaliable() {
+	if !t.Available() {
 		return nil, ErrKeyTypeNotSupported
 	}
 	return crpts[t].SignDigest(priv, digest, hashFunc, rand)
@@ -379,7 +379,7 @@ func SignDigest(t KeyType, priv PrivateKey, digest []byte, hashFunc crypto.Hash,
 
 // Verify reports whether `sig` is a valid signature of message by `pub`.
 func Verify(t KeyType, pub PublicKey, message []byte, sig Signature) (bool, error) {
-	if !t.Avaliable() {
+	if !t.Available() {
 		return false, ErrKeyTypeNotSupported
 	}
 	return crpts[t].Verify(pub, message, sig)

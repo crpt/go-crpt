@@ -314,27 +314,3 @@ func (c *ed25519Crpt) Verify(pub crpt.PublicKey, message []byte, sig crpt.Signat
 		}
 	}
 }
-
-func (c *ed25519Crpt) VerifySigBytes(pub crpt.PublicKey, message []byte, sig []byte,
-) (bool, error) {
-	if len(sig) != SignatureSize {
-		return false, ErrWrongSignatureSize
-	}
-	if c.sha3 {
-		if edpub, ok := pub.(sha3PublicKey); !ok {
-			return false, ErrNotEd25519SHA3PublicKey
-		} else {
-			// This implementation has defined criteria (ZIP 215 w/ SHA3-512) for signature validity
-			return ed25519consensus_sha3.Verify(edpub.Bytes(), message, sig), nil
-			//return ed25519sha3.Verify(ed25519sha3.PublicKey(edpub), message, sig), nil
-		}
-	} else {
-		if edpub, ok := pub.(publicKey); !ok {
-			return false, ErrNotEd25519PublicKey
-		} else {
-			// This implementation has defined criteria (ZIP 215) for signature validity
-			return ed25519consensus.Verify(edpub.Bytes(), message, sig), nil
-			//return ed25519.Verify(ed25519.PublicKey(edpub), message, sig), nil
-		}
-	}
-}
