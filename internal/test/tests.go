@@ -2,6 +2,8 @@ package test
 
 import (
 	"bytes"
+	"crypto"
+	_ "crypto/sha256"
 	"testing"
 
 	"github.com/crpt/go-crpt"
@@ -9,7 +11,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func init() {
+	h := TestHashFunc.New()
+	h.Write(TestMsg)
+	TestDigest = h.Sum(nil)
+}
+
 var (
+	TestHashFunc          = crypto.SHA256
 	TestEd25519PrivateKey = []byte{
 		0x7c, 0xbf, 0x09, 0xb2, 0x31, 0x35, 0x7f, 0x05, 0xb2, 0xd7, 0xcf, 0x8a, 0x43, 0x9e, 0xbb, 0xa1,
 		0x4f, 0x78, 0x80, 0x11, 0x5e, 0x26, 0x22, 0x34, 0x71, 0xf5, 0x69, 0xb7, 0x5d, 0x6f, 0xe7, 0x51,
@@ -19,6 +28,7 @@ var (
 	TestEd25519PrivateKeyTyped = append([]byte{byte(crpt.Ed25519)}, TestEd25519PrivateKey...)
 	TestWrongData              = []byte{0x1, 0x2, 0x3, 0x4}
 	TestMsg                    = []byte{0x1, 0x2, 0x3, 0x4}
+	TestDigest                 []byte
 	TestMsg2                   = []byte{0x1, 0x2, 0x3, 0x4, 0x5}
 )
 
@@ -104,41 +114,81 @@ func Test_XxxFromBytes_SignXxx_Verify(t *testing.T, c crpt.Crpt, privateKey []by
 		sig2, err = c.Sign(priv, TestMsg2, nil, crpt.NotHashed, nil)
 		req.NoError(err)
 	} else {
-		sig, err = crpt.Sign(kt, priv, TestMsg, nil, crpt.NotHashed, nil)
+		sig, err = crpt.Sign(priv, TestMsg, nil, crpt.NotHashed, nil)
 		req.NoError(err)
-		sig2, err = crpt.Sign(kt, priv, TestMsg2, nil, crpt.NotHashed, nil)
+		sig2, err = crpt.Sign(priv, TestMsg2, nil, crpt.NotHashed, nil)
 		req.NoError(err)
 	}
 
 	if c != nil {
 		sig_, err = c.SignMessage(priv, TestMsg, nil)
 	} else {
-		sig_, err = crpt.SignMessage(kt, priv, TestMsg, nil)
+		sig_, err = crpt.SignMessage(priv, TestMsg, nil)
 	}
 	req.NoError(err)
 	assr.Equal(sig, sig_)
 
-	assr.Panics(func() {
-		if c != nil {
-			c.SignDigest(priv, TestMsg, crpt.NotHashed, nil)
-		} else {
-			crpt.SignDigest(kt, priv, TestMsg, crpt.NotHashed, nil)
-		}
-	}, "calling SignDigest with crpt.NotHashed should panic")
+	if c != nil {
+		sig_, err = c.SignDigest(priv, TestDigest, TestHashFunc, nil)
+	} else {
+		sig_, err = crpt.SignDigest(priv, TestDigest, TestHashFunc, nil)
+	}
+	req.NoError(err)
+	assr.Equal(sig, sig_)
+
+	if c != nil {
+		_, err = c.SignDigest(priv, TestMsg, crpt.NotHashed, nil)
+	} else {
+		_, err = crpt.SignDigest(priv, TestMsg, crpt.NotHashed, nil)
+	}
+	assr.ErrorIs(err, crpt.ErrInvalidHashFunc)
 
 	pub := priv.Public()
 	var ok bool
 	if c != nil {
-		ok, err = c.Verify(pub, TestMsg, sig)
+		ok, err = c.Verify(pub, TestMsg, nil, crpt.NotHashed, sig)
 	} else {
-		ok, err = crpt.Verify(kt, pub, TestMsg, sig)
+		ok, err = crpt.Verify(pub, TestMsg, nil, crpt.NotHashed, sig)
 	}
 	assr.NoError(err)
 	assr.True(ok)
+
 	if c != nil {
-		ok, err = c.Verify(pub, TestMsg, sig2)
+		ok, err = c.Verify(pub, TestMsg, nil, crpt.NotHashed, sig2)
 	} else {
-		ok, err = crpt.Verify(kt, pub, TestMsg, sig2)
+		ok, err = crpt.Verify(pub, TestMsg, nil, crpt.NotHashed, sig2)
+	}
+	assr.NoError(err)
+	assr.False(ok)
+
+	if c != nil {
+		ok, err = c.VerifyMessage(pub, TestMsg, sig)
+	} else {
+		ok, err = crpt.VerifyMessage(pub, TestMsg, sig)
+	}
+	assr.NoError(err)
+	assr.True(ok)
+
+	if c != nil {
+		ok, err = c.VerifyMessage(pub, TestMsg, sig2)
+	} else {
+		ok, err = crpt.VerifyMessage(pub, TestMsg, sig2)
+	}
+	assr.NoError(err)
+	assr.False(ok)
+
+	if c != nil {
+		ok, err = c.VerifyDigest(pub, TestDigest, TestHashFunc, sig)
+	} else {
+		ok, err = crpt.VerifyDigest(pub, TestDigest, TestHashFunc, sig)
+	}
+	assr.NoError(err)
+	assr.True(ok)
+
+	if c != nil {
+		ok, err = c.VerifyDigest(pub, TestDigest, TestHashFunc, sig2)
+	} else {
+		ok, err = crpt.VerifyDigest(pub, TestDigest, TestHashFunc, sig2)
 	}
 	assr.NoError(err)
 	assr.False(ok)

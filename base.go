@@ -105,7 +105,7 @@ func (c *BaseCrpt) Sign(priv PrivateKey, message, digest []byte, hashFunc crypto
 	} else if len(message) > 0 {
 		return c.parentCrpt.SignMessage(priv, message, rand)
 	} else {
-		return nil, ErrMessageAndDigestAreBothEmpty
+		return nil, ErrEmptyMessage
 	}
 }
 

@@ -15,9 +15,9 @@ func BenchmarkSignMessage(b *testing.B, c crpt.Crpt, privateKey []byte, kt crpt.
 		}
 
 		if c != nil {
-			c.Sign(priv, TestMsg, nil, crpt.NotHashed, nil)
+			c.SignMessage(priv, TestMsg, nil)
 		} else {
-			crpt.Sign(kt, priv, TestMsg, nil, crpt.NotHashed, nil)
+			crpt.SignMessage(priv, TestMsg, nil)
 		}
 	}
 }
@@ -34,16 +34,16 @@ func BenchmarkVerify(b *testing.B, c crpt.Crpt, privateKey []byte, kt crpt.KeyTy
 	if c != nil {
 		sig, _ = c.Sign(priv, TestMsg, nil, crpt.NotHashed, nil)
 	} else {
-		sig, _ = crpt.Sign(kt, priv, TestMsg, nil, crpt.NotHashed, nil)
+		sig, _ = crpt.Sign(priv, TestMsg, nil, crpt.NotHashed, nil)
 	}
 
 	b.ResetTimer()
 	for i := 0; i < b.N*10000; i++ {
 		pub := priv.Public()
 		if c != nil {
-			_, _ = c.Verify(pub, TestMsg, sig)
+			c.VerifyMessage(pub, TestMsg, sig)
 		} else {
-			_, _ = crpt.Verify(kt, pub, TestMsg, sig)
+			crpt.VerifyMessage(pub, TestMsg, sig)
 		}
 	}
 }
