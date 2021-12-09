@@ -19,9 +19,6 @@ func TestCrpt(t *testing.T) {
 	_, err := New(crpt.Ed25519, crypto.SHA256)
 	assert.NoError(err)
 
-	_, err = New(crpt.Ed25519_SHA3_512, crypto.SHA3_256)
-	assert.NoError(err)
-
 	_, err = New(crpt.MaxCrpt, crypto.Hash(0))
 	assert.Equal(crpt.ErrKeyTypeNotSupported, err)
 

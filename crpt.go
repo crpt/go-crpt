@@ -13,6 +13,7 @@ import (
 	"io"
 
 	"github.com/crpt/go-merkle"
+	gbytes "github.com/daotl/guts/bytes"
 	"github.com/multiformats/go-multihash"
 )
 
@@ -20,7 +21,6 @@ type KeyType uint8
 
 const (
 	Ed25519 KeyType = 1 + iota
-	Ed25519_SHA3_512
 	// This may change as new implementations come out.
 	MaxCrpt
 )
@@ -68,6 +68,9 @@ type PublicKey interface {
 	// NOTE: It's not safe to modify the returned slice because the implementations most likely
 	// return the underlying byte slice directly for the performance reason. Copy it if you need to modify.
 	Address() Address
+
+	//// Verify reports whether `sig` is a valid signature of message by `pub`.
+	//Verify(message []byte, sig Signature) bool
 }
 
 // PrivateKey represents a private key with a specific key type.
@@ -111,7 +114,8 @@ type TypedPrivateKey []byte
 type TypedSignature []byte
 
 // Address represents an address derived from a PublicKey.
-type Address []byte
+// An address is a []byte, but hex-encoded even in JSON.
+type Address gbytes.HexBytes
 
 // Hash represents a hash.
 type Hash []byte

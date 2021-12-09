@@ -2,8 +2,7 @@
 // Use of this source code is governed by the MIT
 // license that can be found in the LICENSE file.
 
-// Package util provides common utils for Crpt implementations.
-package util
+package crpt
 
 import (
 	"crypto"
@@ -12,15 +11,13 @@ import (
 	"strconv"
 
 	"github.com/crpt/go-merkle"
-
-	"github.com/crpt/go-crpt"
 )
 
 // BaseCrpt is a helper struct meant to be anonymously embedded by pointer in all
 // Crpt implementations.
 type BaseCrpt struct {
 	// KeyType used for embedding crpt.Crpt instance
-	keyType crpt.KeyType
+	keyType KeyType
 
 	// hashFunc holds the hash function to be used for Crpt.Hash.
 	hashFunc crypto.Hash
@@ -33,11 +30,11 @@ type BaseCrpt struct {
 	canSignPreHashedMessages bool
 
 	// parentCrpt is the crpt.Crpt instance which is embedding this BaseCrpt instance.
-	parentCrpt crpt.Crpt
+	parentCrpt Crpt
 }
 
-func NewBaseCrpt(t crpt.KeyType, hashFunc crypto.Hash, canSignPreHashedMessages bool,
-	parentCrpt crpt.Crpt) (*BaseCrpt, error) {
+func NewBaseCrpt(t KeyType, hashFunc crypto.Hash, canSignPreHashedMessages bool,
+	parentCrpt Crpt) (*BaseCrpt, error) {
 	if hashFunc != 0 && !hashFunc.Available() {
 		panic("crypto: requested hash function #" + strconv.Itoa(int(hashFunc)) + " is unavailable")
 	}
@@ -61,7 +58,7 @@ func (c *BaseCrpt) checkHashFunc() crypto.Hash {
 }
 
 // KeyType implements crpt.KeyType.
-func (c *BaseCrpt) KeyType() crpt.KeyType {
+func (c *BaseCrpt) KeyType() KeyType {
 	return c.keyType
 }
 
@@ -71,14 +68,14 @@ func (c *BaseCrpt) HashFunc() crypto.Hash {
 }
 
 // Hash implements Crpt.Hash using BaseCrpt.hashFunc.
-func (c *BaseCrpt) Hash(b []byte) crpt.Hash {
+func (c *BaseCrpt) Hash(b []byte) Hash {
 	h := c.checkHashFunc().New()
 	h.Write(b)
 	return h.Sum(nil)
 }
 
 // Hash implements Crpt.Hash using BaseCrpt.hashFunc.
-func (c *BaseCrpt) HashTyped(b []byte) crpt.TypedHash {
+func (c *BaseCrpt) HashTyped(b []byte) TypedHash {
 	h := c.checkHashFunc().New()
 	h.Write(b)
 	s := h.Sum(nil)
@@ -94,21 +91,21 @@ func (c *BaseCrpt) SumHashTyped(h hash.Hash, b []byte) []byte {
 }
 
 // HashToTyped decorates a hash into a TypedHash.
-func (c *BaseCrpt) HashToTyped(h crpt.Hash) crpt.TypedHash {
+func (c *BaseCrpt) HashToTyped(h Hash) TypedHash {
 	ht := make([]byte, len(h))
 	ht[0] = c.hashFuncByte
 	return ht
 }
 
 // Sign implements Crpt.Sign, see Crpt.Sign for details.
-func (c *BaseCrpt) Sign(priv crpt.PrivateKey, message, digest []byte, hashFunc crypto.Hash, rand io.Reader,
-) (crpt.Signature, error) {
+func (c *BaseCrpt) Sign(priv PrivateKey, message, digest []byte, hashFunc crypto.Hash, rand io.Reader,
+) (Signature, error) {
 	if len(digest) > 0 && c.canSignPreHashedMessages {
 		return c.parentCrpt.SignDigest(priv, digest, hashFunc, rand)
 	} else if len(message) > 0 {
 		return c.parentCrpt.SignMessage(priv, message, rand)
 	} else {
-		return nil, crpt.ErrMessageAndDigestAreBothEmpty
+		return nil, ErrMessageAndDigestAreBothEmpty
 	}
 }
 
@@ -119,7 +116,7 @@ func (c *BaseCrpt) MerkleHashFromByteSlices(items [][]byte) (rootHash []byte) {
 }
 
 // Sign implements Crpt.MerkleHashTypedFromByteSlices using `crpt/go-merkle`.
-func (c *BaseCrpt) MerkleHashTypedFromByteSlices(items [][]byte) (rootHash crpt.TypedHash) {
+func (c *BaseCrpt) MerkleHashTypedFromByteSlices(items [][]byte) (rootHash TypedHash) {
 	h := c.checkHashFunc()
 	rootHash = merkle.HashFromByteSlicesIterative(h, items)
 	rootHash[0] = byte(h)
@@ -135,7 +132,7 @@ func (c *BaseCrpt) MerkleProofsFromByteSlices(items [][]byte,
 
 // Sign implements Crpt.MerkleProofsTypedFromByteSlices using `crpt/go-merkle`.
 func (c *BaseCrpt) MerkleProofsTypedFromByteSlices(items [][]byte,
-) (rootHash crpt.TypedHash, proofs []*merkle.Proof) {
+) (rootHash TypedHash, proofs []*merkle.Proof) {
 	h := c.checkHashFunc()
 	rootHash, proofs = merkle.ProofsFromByteSlices(h, items)
 	rootHash[0] = byte(h)

@@ -203,6 +203,8 @@ github.com/daotl/go-ds-leveldb v0.5.0/go.mod h1:4biY5O9mGWuAoRF+6ECCiCLfc8+siSzT
 github.com/daotl/go-log/v2 v2.3.1/go.mod h1:LmdK9eST2KOb/X390HHz2j0Nq5xVC1OELtygzDRWVy4=
 github.com/daotl/guts v0.0.0-20211113134343-8f7ed309bc45 h1:MvQBGKvgeKAKdKiny1507SUV0XLuAkFN06L98K9KDOE=
 github.com/daotl/guts v0.0.0-20211113134343-8f7ed309bc45/go.mod h1:0Q9jJiYQdgiqLy2s1LuoSypeE/t7h07lD16U0FMRSls=
+github.com/daotl/guts v0.0.0-20211209025214-8adf29ee30eb h1:s43ws9IpJJXjV1bDX2Z8gp0k98bwjfcHtY93OE7uy68=
+github.com/daotl/guts v0.0.0-20211209025214-8adf29ee30eb/go.mod h1:0Q9jJiYQdgiqLy2s1LuoSypeE/t7h07lD16U0FMRSls=
 github.com/davecgh/go-spew v0.0.0-20161028175848-04cdfd42973b/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v0.0.0-20171005155431-ecdeabc65495/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=

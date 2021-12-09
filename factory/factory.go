@@ -16,9 +16,7 @@ import (
 func New(keyType crpt.KeyType, hashFunc crypto.Hash) (crpt.Crpt, error) {
 	switch keyType {
 	case crpt.Ed25519:
-		return ed25519.New(false, hashFunc)
-	case crpt.Ed25519_SHA3_512:
-		return ed25519.New(true, hashFunc)
+		return ed25519.New(hashFunc)
 	default:
 		return nil, crpt.ErrKeyTypeNotSupported
 	}
@@ -31,9 +29,7 @@ func MustNew(keyType crpt.KeyType, hashFunc crypto.Hash) crpt.Crpt {
 	var err error
 	switch keyType {
 	case crpt.Ed25519:
-		crypt, err = ed25519.New(false, hashFunc)
-	case crpt.Ed25519_SHA3_512:
-		crypt, err = ed25519.New(true, hashFunc)
+		crypt, err = ed25519.New(hashFunc)
 	default:
 		panic(crpt.ErrKeyTypeNotSupported)
 	}

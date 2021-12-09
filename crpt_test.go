@@ -15,6 +15,5 @@ import (
 func TestCrpt(t *testing.T) {
 	t.Run("XxxFromBytes, SignXxx, Verify", func(t *testing.T) {
 		test.Test_XxxFromBytes_SignXxx_Verify(t, nil, test.TestEd25519PrivateKeyTyped, Ed25519)
-		test.Test_XxxFromBytes_SignXxx_Verify(t, nil, test.TestEd25519SHA3PrivateKeyTyped, Ed25519_SHA3_512)
 	})
 }

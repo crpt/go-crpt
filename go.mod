@@ -15,6 +15,7 @@ require (
 	filippo.io/edwards25519 v1.0.0-rc.1 // indirect
 	github.com/btcsuite/btcd v0.22.0-beta // indirect
 	github.com/daotl/go-acei v0.0.0-20211201154418-8daef5059165 // indirect
+	github.com/daotl/guts v0.0.0-20211209025214-8adf29ee30eb // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
