@@ -10,12 +10,11 @@ import (
 	"crypto"
 	"crypto/subtle"
 	"errors"
-	"hash"
-	"io"
-
 	"github.com/crpt/go-merkle"
 	gbytes "github.com/daotl/guts/bytes"
 	"github.com/multiformats/go-multihash"
+	"hash"
+	"io"
 )
 
 type KeyType uint8
@@ -428,4 +427,21 @@ func VerifyMessage(pub PublicKey, message []byte, sig Signature) (bool, error) {
 // See PublicKey.VerifyDigest for more details.
 func VerifyDigest(pub PublicKey, digest []byte, hashFunc crypto.Hash, sig Signature) (bool, error) {
 	return pub.VerifyDigest(digest, hashFunc, sig)
+}
+
+/* Batch */
+
+// BatchVerifier provides batch signature verification.
+//
+// If a new key type implements batch verification,
+// the key type must be registered in `github.com/crpt/go-crpt/batch`
+type BatchVerifier interface {
+	// Add appends an entry into the BatchVerifier.
+	Add(key PublicKey, message []byte, sig Signature) error
+
+	// Verify verifies all the entries in the BatchVerifier, and returns
+	// if every signature in the batch is valid, and a vector of bools
+	// indicating the verification status of each signature (in the order
+	// that signatures were added to the batch).
+	Verify(rand io.Reader) (bool, []bool)
 }

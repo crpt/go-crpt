@@ -1,3 +1,7 @@
+// Copyright 2021 Nex Zhu. All rights reserved.
+// Use of this source code is governed by the MIT
+// license that can be found in the LICENSE file.
+
 package test
 
 import (
@@ -5,6 +9,7 @@ import (
 	"crypto"
 	_ "crypto/sha512"
 	"fmt"
+	"github.com/crpt/go-crpt/batch"
 	"testing"
 
 	"github.com/crpt/go-crpt"
@@ -194,4 +199,43 @@ func Test_XxxFromBytes_SignXxx_Verify(t *testing.T, c crpt.Crpt, privateKey []by
 	}
 	assr.NoError(err)
 	assr.False(ok)
+}
+
+func Test_Batch(t *testing.T, c crpt.Crpt, kt crpt.KeyType) {
+	req := require.New(t)
+
+	v, ok := batch.NewBatchVerifier(kt)
+	if !ok {
+		return
+	}
+
+	var (
+		pub  crpt.PublicKey
+		priv crpt.PrivateKey
+		err  error
+	)
+	for i := 0; i <= 38; i++ {
+		if c != nil {
+			pub, priv, err = c.GenerateKey(nil)
+		} else {
+			pub, priv, err = crpt.GenerateKey(kt, nil)
+		}
+		req.NoError(err)
+
+		var msg []byte
+		if i%2 == 0 {
+			msg = []byte("easter")
+		} else {
+			msg = []byte("egg")
+		}
+
+		sig, err := priv.SignMessage(msg, nil)
+		req.NoError(err)
+
+		err = v.Add(pub, msg, sig)
+		req.NoError(err)
+	}
+
+	ok, _ = v.Verify(nil)
+	req.True(ok)
 }

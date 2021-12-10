@@ -10,7 +10,7 @@ See [godoc](https://pkg.go.dev/github.com/crpt/go-crpt).
 
 ## Currently available implementations:
 
-## [ed25519](./ed25519/ed25519.go)
+### [ed25519](./ed25519/ed25519.go)
 
 EPackage `ed25519` provides an Ed25519 implementation backed by
 [curve25519-voi](https://github.com/oasisprotocol/curve25519-voi) package.
@@ -32,3 +32,12 @@ which is a fork of [crypto/ed25519](https://pkg.go.dev/crypto/ed25519) std packa
 using [go-ed25519consensus-sha3-512](https://pkg.go.dev/github.com/crpt/go-ed25519consensus-sha3-512) package for signature verification,
 which is a fork of [ed25519consensus](https://pkg.go.dev/github.com/hdevalence/ed25519consensus) package, modified to use SHA3-512 instead of SHA-512.
 So it's also suitable for consensus-critical contexts.
+
+## Inspirations
+
+- [crypto](https://pkg.go.dev/crypto) std package
+- [github.com/tendermint/tendermint/crypto](https://pkg.go.dev/github.com/tendermint/tendermint/crypto) package
+
+## License
+
+[MIT](LICENSE) © DAOT Labs.

@@ -11,10 +11,10 @@ package ed25519
 import (
 	"bytes"
 	"crypto"
-	"crypto/ed25519"
 	"crypto/subtle"
 	"errors"
 	"fmt"
+	"github.com/oasisprotocol/curve25519-voi/primitives/ed25519/extra/cache"
 	"io"
 
 	gerr "github.com/daotl/guts/error"
@@ -35,6 +35,14 @@ const (
 	SeedSize = 32
 	// 64 bytes
 	AddressSize = PublicKeySize
+
+	// cacheSize is the number of public keys that will be cached in
+	// an expanded format for repeated signature verification.
+	//
+	// TODO/perf: Either this should exclude single verification, or be
+	// tuned to `> validatorSize + maxTxnsPerBlock` to avoid cache
+	// thrashing.
+	cacheSize = 4096
 )
 
 func init() {
@@ -45,13 +53,14 @@ func init() {
 var (
 	optContext         = ""
 	optAddedRandomness = false
-	optVerfiy          = ved25519.VerifyOptionsFIPS_186_5
+	optVerfiy          = ved25519.VerifyOptionsZIP_215
 	notHashedOpts      = &ved25519.Options{
 		Hash:            crpt.NotHashed,
 		Context:         optContext,
 		AddedRandomness: optAddedRandomness,
 		Verify:          optVerfiy,
 	}
+	cachingVerifier = cache.NewVerifier(cache.NewLRUCache(cacheSize))
 )
 
 // SetEd25519Options sets the Ed25519 options used by this package.
@@ -147,7 +156,7 @@ func (pub PublicKey) VerifyMessage(message []byte, sig crpt.Signature) (ok bool,
 			err = gerr.ToError(r)
 		}
 	}()
-	return ved25519.VerifyWithOptions(ved25519.PublicKey(pub), message, sig, notHashedOpts), nil
+	return cachingVerifier.VerifyWithOptions(ved25519.PublicKey(pub), message, sig, notHashedOpts), nil
 }
 
 func (pub PublicKey) VerifyDigest(digest []byte, hashFunc crypto.Hash, sig crpt.Signature,
@@ -165,7 +174,7 @@ func (pub PublicKey) VerifyDigest(digest []byte, hashFunc crypto.Hash, sig crpt.
 			err = gerr.ToError(r)
 		}
 	}()
-	return ved25519.VerifyWithOptions(ved25519.PublicKey(pub), digest, sig, &ved25519.Options{
+	return cachingVerifier.VerifyWithOptions(ved25519.PublicKey(pub), digest, sig, &ved25519.Options{
 		Hash:            hashFunc,
 		Context:         optContext,
 		AddedRandomness: optAddedRandomness,
@@ -305,7 +314,7 @@ func (c *ed25519Crpt) SignatureToTyped(sig crpt.Signature) (crpt.TypedSignature,
 func (c *ed25519Crpt) GenerateKey(rand io.Reader,
 ) (cpub crpt.PublicKey, cpriv crpt.PrivateKey, err error) {
 	var pub, priv []byte
-	pub, priv, err = ed25519.GenerateKey(rand)
+	pub, priv, err = ved25519.GenerateKey(rand)
 	if err == nil {
 		cpub, err = c.PublicKeyFromBytes(pub)
 	}
@@ -370,4 +379,39 @@ func (c *ed25519Crpt) VerifyDigest(
 	} else {
 		return edpub.VerifyDigest(digest, hashFunc, sig)
 	}
+}
+
+/* Batch */
+
+// BatchVerifier implements batch verification for ed25519.
+type BatchVerifier struct {
+	*ved25519.BatchVerifier
+}
+
+func NewBatchVerifier() crpt.BatchVerifier {
+	return &BatchVerifier{ved25519.NewBatchVerifier()}
+}
+
+func (b *BatchVerifier) Add(pub crpt.PublicKey, message []byte, sig crpt.Signature) error {
+	edpub, ok := pub.(PublicKey)
+	if !ok {
+		return ErrNotEd25519PublicKey
+	}
+
+	if l := len(edpub); l != PublicKeySize {
+		return fmt.Errorf("%v; expected: %d, got %d", crpt.ErrWrongPublicKeySize, PublicKeySize, l)
+	}
+
+	// check that the signature is the correct length
+	if len(sig) != SignatureSize {
+		return crpt.ErrWrongSignatureSize
+	}
+
+	cachingVerifier.AddWithOptions(b.BatchVerifier, ved25519.PublicKey(edpub), message, sig, notHashedOpts)
+
+	return nil
+}
+
+func (b *BatchVerifier) Verify(rand io.Reader) (bool, []bool) {
+	return b.BatchVerifier.Verify(rand)
 }

@@ -72,4 +72,8 @@ func TestEd25519Crpt(t *testing.T) {
 		//assr.NoError(err)
 		//assr.False(ok)
 	})
+
+	t.Run("Batch", func(t *testing.T) {
+		test.Test_Batch(t, c, crpt.Ed25519)
+	})
 }
