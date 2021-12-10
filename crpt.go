@@ -8,6 +8,7 @@ package crpt
 import (
 	"bytes"
 	"crypto"
+	"crypto/subtle"
 	"errors"
 	"hash"
 	"io"
@@ -51,6 +52,7 @@ type PublicKey interface {
 	KeyType() KeyType
 
 	// Equal reports whether this key is equal to another key.
+	// Runs in constant time based on length of the keys to prevent time attacks.
 	Equal(PublicKey) bool
 
 	// Bytes returns the bytes representation of the public key.
@@ -103,6 +105,7 @@ type PrivateKey interface {
 	KeyType() KeyType
 
 	// Equal reports whether this key is equal to another key.
+	// Runs in constant time based on length of the keys to prevent time attacks.
 	Equal(PrivateKey) bool
 
 	// Bytes returns the bytes representation of the private key.
@@ -281,9 +284,15 @@ func RegisterCrpt(t KeyType, c Crpt) {
 	crpts[t] = c
 }
 
+// Equal reports whether this signature is equal to another one.
+// Runs in constant time based on length of the keys to prevent time attacks.
+func (sig Signature) Equal(o Signature) bool {
+	return subtle.ConstantTimeCompare(sig, o) == 1
+}
+
 // Equal reports whether this key is equal to another key.
 func (pub TypedPublicKey) Equal(o TypedPublicKey) bool {
-	return bytes.Compare(pub, o) == 0
+	return bytes.Equal(pub, o)
 }
 
 // Raw return the raw bytes of the public key without the 1-byte key type prefix.
@@ -295,8 +304,9 @@ func (pub TypedPublicKey) Raw() []byte {
 }
 
 // Equal reports whether this key is equal to another key.
+// Runs in constant time based on length of the keys to prevent time attacks.
 func (priv TypedPrivateKey) Equal(o TypedPrivateKey) bool {
-	return bytes.Compare(priv, o) == 0
+	return subtle.ConstantTimeCompare(priv, o) == 1
 }
 
 // Raw return the raw bytes of the private key without the 1-byte key type prefix.
@@ -309,7 +319,7 @@ func (priv TypedPrivateKey) Raw() []byte {
 
 // Equal reports whether this hash is equal to another hash.
 func (h TypedHash) Equal(o TypedHash) bool {
-	return bytes.Compare(h, o) == 0
+	return bytes.Equal(h, o)
 }
 
 // HashToTyped decorates a hash into a TypedHash with crypto.Hash.

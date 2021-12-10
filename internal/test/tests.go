@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto"
 	_ "crypto/sha512"
+	"fmt"
 	"testing"
 
 	"github.com/crpt/go-crpt"
@@ -68,6 +69,8 @@ func Test_PrivateKey_PublicKey(t *testing.T, c crpt.Crpt) {
 	assr.True(pub.Equal(pub))
 	assr.False(pub.Equal(pub2))
 	assr.False(pub2.Equal(pub))
+	e := priv.Equal(priv)
+	fmt.Println(e)
 	assr.True(priv.Equal(priv))
 	assr.False(priv.Equal(priv2))
 	assr.False(priv2.Equal(priv))

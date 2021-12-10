@@ -12,6 +12,7 @@ import (
 	"bytes"
 	"crypto"
 	"crypto/ed25519"
+	"crypto/subtle"
 	"errors"
 	"fmt"
 	"io"
@@ -22,9 +23,23 @@ import (
 	"github.com/crpt/go-crpt"
 )
 
+const (
+	KeyType = crpt.Ed25519
+	// 32 bytes
+	PublicKeySize = ved25519.PublicKeySize
+	// 64 bytes
+	PrivateKeySize = ved25519.PrivateKeySize
+	// 64 bytes (The size of a compressed, Edwards25519 point, and a field element. Both of which are 32 bytes.)
+	SignatureSize = ved25519.SignatureSize
+	// 32 bytes private key seeds. (These are the private key representations used by RFC 8032.)
+	SeedSize = 32
+	// 64 bytes
+	AddressSize = PublicKeySize
+)
+
 func init() {
 	c, _ := New(0)
-	crpt.RegisterCrpt(crpt.Ed25519, c)
+	crpt.RegisterCrpt(KeyType, c)
 }
 
 var (
@@ -54,19 +69,8 @@ func SetEd25519Options(context string, addedRandomness bool, verify *ved25519.Ve
 	}
 }
 
-const (
-	// 32
-	PublicKeySize = ved25519.PublicKeySize
-	// 64
-	PrivateKeySize = ved25519.PrivateKeySize
-	// 64
-	SignatureSize = ved25519.SignatureSize
-	// 64
-	AddressSize = PublicKeySize
-)
-
 var (
-	KeyTypeByte = byte(crpt.Ed25519)
+	KeyTypeByte = byte(KeyType)
 
 	ErrWrongPublicKeySize   = fmt.Errorf("%w, should be 32 bytes", crpt.ErrWrongPublicKeySize)
 	ErrWrongPrivateKeySize  = fmt.Errorf("%w, should be 64 bytes", crpt.ErrWrongPrivateKeySize)
@@ -76,32 +80,36 @@ var (
 )
 
 // Ed25519 32-byte public key
-type publicKey ved25519.PublicKey
+type PublicKey ved25519.PublicKey
 
 // Ed25519 32-byte private key + 32-byte public key suffix = 64 bytes
 // See: https://pkg.go.dev/crypto/ed25519
-type privateKey ved25519.PrivateKey
+type PrivateKey ved25519.PrivateKey
 
 // Ed25519 33-byte address (the same as TypedPublicKey)
 type Address = crpt.Address
 
-func (pub publicKey) KeyType() crpt.KeyType {
-	return crpt.Ed25519
+func (pub PublicKey) KeyType() crpt.KeyType {
+	return KeyType
 }
 
-func (pub publicKey) Equal(o crpt.PublicKey) bool {
-	return bytes.Compare(pub, o.Bytes()) == 0
+func (pub PublicKey) Equal(o crpt.PublicKey) bool {
+	if oed, ok := o.(PublicKey); !ok {
+		return false
+	} else {
+		return bytes.Equal(pub, oed)
+	}
 }
 
 // Bytes's returned byte slice is not safe to modify because it returns the underlying byte slice
 // directly for the performance reason. Copy it if you need to modify.
-func (pub publicKey) Bytes() []byte {
+func (pub PublicKey) Bytes() []byte {
 	return pub
 }
 
 // TypedBytes's returned byte slice is not safe to modify because it returns the underlying
 // byte slice directly for the performance reason. Copy it if you need to modify.
-func (pub publicKey) TypedBytes() crpt.TypedPublicKey {
+func (pub PublicKey) TypedBytes() crpt.TypedPublicKey {
 	k := make([]byte, PublicKeySize+1)
 	k[0] = KeyTypeByte
 	copy(k[1:PublicKeySize+1], pub)
@@ -113,11 +121,11 @@ func (pub publicKey) TypedBytes() crpt.TypedPublicKey {
 //
 // Address's returned byte slice is not safe to modify because it returns the underlying byte slice
 // directly for the performance reason. Copy it if you need to modify.
-func (pub publicKey) Address() Address {
+func (pub PublicKey) Address() Address {
 	return Address(pub)
 }
 
-func (pub publicKey) Verify(message, digest []byte, hashFunc crypto.Hash, sig crpt.Signature,
+func (pub PublicKey) Verify(message, digest []byte, hashFunc crypto.Hash, sig crpt.Signature,
 ) (bool, error) {
 	if digest != nil && hashFunc.Available() {
 		return pub.VerifyDigest(digest, hashFunc, sig)
@@ -128,7 +136,11 @@ func (pub publicKey) Verify(message, digest []byte, hashFunc crypto.Hash, sig cr
 	}
 }
 
-func (pub publicKey) VerifyMessage(message []byte, sig crpt.Signature) (ok bool, err error) {
+func (pub PublicKey) VerifyMessage(message []byte, sig crpt.Signature) (ok bool, err error) {
+	if len(sig) != SignatureSize {
+		return false, nil
+	}
+
 	defer func() {
 		if r := recover(); r != nil {
 			ok = false
@@ -138,10 +150,13 @@ func (pub publicKey) VerifyMessage(message []byte, sig crpt.Signature) (ok bool,
 	return ved25519.VerifyWithOptions(ved25519.PublicKey(pub), message, sig, notHashedOpts), nil
 }
 
-func (pub publicKey) VerifyDigest(digest []byte, hashFunc crypto.Hash, sig crpt.Signature,
+func (pub PublicKey) VerifyDigest(digest []byte, hashFunc crypto.Hash, sig crpt.Signature,
 ) (ok bool, err error) {
 	if !hashFunc.Available() {
 		return false, crpt.ErrInvalidHashFunc
+	}
+	if len(sig) != SignatureSize {
+		return false, nil
 	}
 
 	defer func() {
@@ -158,35 +173,60 @@ func (pub publicKey) VerifyDigest(digest []byte, hashFunc crypto.Hash, sig crpt.
 	}), nil
 }
 
-func (priv privateKey) KeyType() crpt.KeyType {
-	return crpt.Ed25519
+func (priv PrivateKey) KeyType() crpt.KeyType {
+	return KeyType
 }
 
-func (priv privateKey) Equal(o crpt.PrivateKey) bool {
-	return bytes.Compare(priv, o.Bytes()) == 0
+func (priv PrivateKey) Equal(o crpt.PrivateKey) bool {
+	if oed, ok := o.(PrivateKey); !ok {
+		return false
+	} else {
+		return subtle.ConstantTimeCompare(priv, oed) == 1
+	}
 }
 
 // Bytes's returned byte slice is not safe to modify because it returns the underlying byte slice
 // directly for the performance reason. Copy it if you need to modify.
-func (priv privateKey) Bytes() []byte {
+func (priv PrivateKey) Bytes() []byte {
 	return priv
 }
 
 // TypedBytes's returned byte slice is not safe to modify because it returns the underlying
 // byte slice directly for the performance reason. Copy it if you need to modify.
-func (priv privateKey) TypedBytes() crpt.TypedPrivateKey {
+func (priv PrivateKey) TypedBytes() crpt.TypedPrivateKey {
 	k := make([]byte, PrivateKeySize+1)
 	k[0] = KeyTypeByte
 	copy(k[1:PrivateKeySize+1], priv)
 	return crpt.TypedPrivateKey(priv)
 }
 
-func (priv privateKey) Public() crpt.PublicKey {
+// Panics if the private key is not initialized.
+func (priv PrivateKey) Public() crpt.PublicKey {
+	// If the latter 32 bytes of `priv` are all zero, `priv` is not initialized.
+	initialized := false
+	for _, v := range priv[32:] {
+		if v != 0 {
+			initialized = true
+			break
+		}
+	}
+
+	if !initialized {
+		panic("Expected ed25519 PrivateKey to include concatenated PublicKey bytes")
+	}
+
 	pub, _ := publicKeyFromBytes(ved25519.PrivateKey(priv).Public().(ved25519.PublicKey))
 	return pub
 }
 
-func (priv privateKey) Sign(message, digest []byte, hashFunc crypto.Hash, rand io.Reader,
+// Sign produces a signature on the provided message.
+// This assumes the privkey is wellformed in the golang format.
+// The first 32 bytes should be random,
+// corresponding to the normal ed25519 private key.
+// The latter 32 bytes should be the compressed public key.
+// If these conditions aren't met, Sign will return an error
+// or produce an incorrect signature.
+func (priv PrivateKey) Sign(message, digest []byte, hashFunc crypto.Hash, rand io.Reader,
 ) (crpt.Signature, error) {
 	if digest != nil && hashFunc.Available() {
 		return priv.SignDigest(digest, hashFunc, rand)
@@ -197,11 +237,11 @@ func (priv privateKey) Sign(message, digest []byte, hashFunc crypto.Hash, rand i
 	}
 }
 
-func (priv privateKey) SignMessage(message []byte, rand io.Reader) (crpt.Signature, error) {
+func (priv PrivateKey) SignMessage(message []byte, rand io.Reader) (crpt.Signature, error) {
 	return ved25519.PrivateKey(priv).Sign(rand, message, notHashedOpts)
 }
 
-func (priv privateKey) SignDigest(digest []byte, hashFunc crypto.Hash, rand io.Reader,
+func (priv PrivateKey) SignDigest(digest []byte, hashFunc crypto.Hash, rand io.Reader,
 ) (crpt.Signature, error) {
 	if !hashFunc.Available() {
 		return nil, crpt.ErrInvalidHashFunc
@@ -218,8 +258,7 @@ func (priv privateKey) SignDigest(digest []byte, hashFunc crypto.Hash, rand io.R
 // New creates an Ed225519 Crpt.
 func New(hash crypto.Hash) (*ed25519Crpt, error) {
 	crypt := &ed25519Crpt{}
-	ktype := crpt.Ed25519
-	base, err := crpt.NewBaseCrpt(ktype, hash, false, crypt)
+	base, err := crpt.NewBaseCrpt(KeyType, hash, false, crypt)
 	if err != nil {
 		return nil, err
 	}
@@ -241,14 +280,14 @@ func publicKeyFromBytes(pub []byte) (crpt.PublicKey, error) {
 	if len(pub) != PublicKeySize {
 		return nil, ErrWrongPublicKeySize
 	}
-	return publicKey(pub), nil
+	return PublicKey(pub), nil
 }
 
 func (c *ed25519Crpt) PrivateKeyFromBytes(priv []byte) (crpt.PrivateKey, error) {
 	if len(priv) != PrivateKeySize {
 		return nil, ErrWrongPrivateKeySize
 	}
-	return privateKey(priv), nil
+	return PrivateKey(priv), nil
 }
 
 // SignatureToTyped's returned byte slice is not safe to modify because it returns the underlying
@@ -279,7 +318,7 @@ func (c *ed25519Crpt) GenerateKey(rand io.Reader,
 func (c *ed25519Crpt) Sign(
 	priv crpt.PrivateKey, message, digest []byte, hashFunc crypto.Hash, rand io.Reader,
 ) (crpt.Signature, error) {
-	if edpriv, ok := priv.(privateKey); !ok {
+	if edpriv, ok := priv.(PrivateKey); !ok {
 		return nil, ErrNotEd25519PrivateKey
 	} else {
 		return edpriv.Sign(message, digest, hashFunc, rand)
@@ -288,7 +327,7 @@ func (c *ed25519Crpt) Sign(
 
 func (c *ed25519Crpt) SignMessage(priv crpt.PrivateKey, message []byte, rand io.Reader,
 ) (crpt.Signature, error) {
-	if edpriv, ok := priv.(privateKey); !ok {
+	if edpriv, ok := priv.(PrivateKey); !ok {
 		return nil, ErrNotEd25519PrivateKey
 	} else {
 		return edpriv.SignMessage(message, rand)
@@ -297,7 +336,7 @@ func (c *ed25519Crpt) SignMessage(priv crpt.PrivateKey, message []byte, rand io.
 
 func (c *ed25519Crpt) SignDigest(priv crpt.PrivateKey, digest []byte, hashFunc crypto.Hash, rand io.Reader,
 ) (crpt.Signature, error) {
-	if edpriv, ok := priv.(privateKey); !ok {
+	if edpriv, ok := priv.(PrivateKey); !ok {
 		return nil, ErrNotEd25519PrivateKey
 	} else {
 		return edpriv.SignDigest(digest, hashFunc, rand)
@@ -307,7 +346,7 @@ func (c *ed25519Crpt) SignDigest(priv crpt.PrivateKey, digest []byte, hashFunc c
 func (c *ed25519Crpt) Verify(
 	pub crpt.PublicKey, message, digest []byte, hashFunc crypto.Hash, sig crpt.Signature,
 ) (bool, error) {
-	if edpub, ok := pub.(publicKey); !ok {
+	if edpub, ok := pub.(PublicKey); !ok {
 		return false, ErrNotEd25519PublicKey
 	} else {
 		return edpub.Verify(message, digest, hashFunc, sig)
@@ -316,7 +355,7 @@ func (c *ed25519Crpt) Verify(
 
 func (c *ed25519Crpt) VerifyMessage(pub crpt.PublicKey, message []byte, sig crpt.Signature,
 ) (bool, error) {
-	if edpub, ok := pub.(publicKey); !ok {
+	if edpub, ok := pub.(PublicKey); !ok {
 		return false, ErrNotEd25519PublicKey
 	} else {
 		return edpub.VerifyMessage(message, sig)
@@ -326,7 +365,7 @@ func (c *ed25519Crpt) VerifyMessage(pub crpt.PublicKey, message []byte, sig crpt
 func (c *ed25519Crpt) VerifyDigest(
 	pub crpt.PublicKey, digest []byte, hashFunc crypto.Hash, sig crpt.Signature,
 ) (bool, error) {
-	if edpub, ok := pub.(publicKey); !ok {
+	if edpub, ok := pub.(PublicKey); !ok {
 		return false, ErrNotEd25519PublicKey
 	} else {
 		return edpub.VerifyDigest(digest, hashFunc, sig)

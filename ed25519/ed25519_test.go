@@ -23,7 +23,7 @@ func TestEd25519Crpt(t *testing.T) {
 	c, err := New(crypto.SHA256)
 	req.NoError(err)
 
-	t.Run("publicKey/privateKey", func(t *testing.T) {
+	t.Run("PublicKey/PrivateKey", func(t *testing.T) {
 		test.Test_PrivateKey_PublicKey(t, c)
 	})
 
