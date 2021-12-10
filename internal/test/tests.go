@@ -3,7 +3,7 @@ package test
 import (
 	"bytes"
 	"crypto"
-	_ "crypto/sha256"
+	_ "crypto/sha512"
 	"testing"
 
 	"github.com/crpt/go-crpt"
@@ -18,7 +18,7 @@ func init() {
 }
 
 var (
-	TestHashFunc          = crypto.SHA256
+	TestHashFunc          = crypto.SHA512
 	TestEd25519PrivateKey = []byte{
 		0x7c, 0xbf, 0x09, 0xb2, 0x31, 0x35, 0x7f, 0x05, 0xb2, 0xd7, 0xcf, 0x8a, 0x43, 0x9e, 0xbb, 0xa1,
 		0x4f, 0x78, 0x80, 0x11, 0x5e, 0x26, 0x22, 0x34, 0x71, 0xf5, 0x69, 0xb7, 0x5d, 0x6f, 0xe7, 0x51,
@@ -134,7 +134,6 @@ func Test_XxxFromBytes_SignXxx_Verify(t *testing.T, c crpt.Crpt, privateKey []by
 		sig_, err = crpt.SignDigest(priv, TestDigest, TestHashFunc, nil)
 	}
 	req.NoError(err)
-	assr.Equal(sig, sig_)
 
 	if c != nil {
 		_, err = c.SignDigest(priv, TestMsg, crpt.NotHashed, nil)
@@ -178,9 +177,9 @@ func Test_XxxFromBytes_SignXxx_Verify(t *testing.T, c crpt.Crpt, privateKey []by
 	assr.False(ok)
 
 	if c != nil {
-		ok, err = c.VerifyDigest(pub, TestDigest, TestHashFunc, sig)
+		ok, err = c.VerifyDigest(pub, TestDigest, TestHashFunc, sig_)
 	} else {
-		ok, err = crpt.VerifyDigest(pub, TestDigest, TestHashFunc, sig)
+		ok, err = crpt.VerifyDigest(pub, TestDigest, TestHashFunc, sig_)
 	}
 	assr.NoError(err)
 	assr.True(ok)

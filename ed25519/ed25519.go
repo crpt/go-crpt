@@ -16,8 +16,10 @@ import (
 	"fmt"
 	"io"
 
+	gerr "github.com/daotl/guts/error"
+	ved25519 "github.com/oasisprotocol/curve25519-voi/primitives/ed25519"
+
 	"github.com/crpt/go-crpt"
-	"github.com/crpt/go-ed25519consensus"
 )
 
 func init() {
@@ -25,13 +27,40 @@ func init() {
 	crpt.RegisterCrpt(crpt.Ed25519, c)
 }
 
+var (
+	optContext         = ""
+	optAddedRandomness = false
+	optVerfiy          = ved25519.VerifyOptionsFIPS_186_5
+	notHashedOpts      = &ved25519.Options{
+		Hash:            crpt.NotHashed,
+		Context:         optContext,
+		AddedRandomness: optAddedRandomness,
+		Verify:          optVerfiy,
+	}
+)
+
+// SetEd25519Options sets the Ed25519 options used by this package.
+//
+// See `github.com/oasisprotocol/curve25519-voi/primitives/ed25519.Options` for parameter details.
+func SetEd25519Options(context string, addedRandomness bool, verify *ved25519.VerifyOptions) {
+	optContext = context
+	optAddedRandomness = addedRandomness
+	optVerfiy = verify
+	notHashedOpts = &ved25519.Options{
+		Hash:            crpt.NotHashed,
+		Context:         optContext,
+		AddedRandomness: optAddedRandomness,
+		Verify:          optVerfiy,
+	}
+}
+
 const (
 	// 32
-	PublicKeySize = ed25519.PublicKeySize
+	PublicKeySize = ved25519.PublicKeySize
 	// 64
-	PrivateKeySize = ed25519.PrivateKeySize
+	PrivateKeySize = ved25519.PrivateKeySize
 	// 64
-	SignatureSize = ed25519.SignatureSize
+	SignatureSize = ved25519.SignatureSize
 	// 64
 	AddressSize = PublicKeySize
 )
@@ -47,11 +76,11 @@ var (
 )
 
 // Ed25519 32-byte public key
-type publicKey ed25519.PublicKey
+type publicKey ved25519.PublicKey
 
 // Ed25519 32-byte private key + 32-byte public key suffix = 64 bytes
 // See: https://pkg.go.dev/crypto/ed25519
-type privateKey ed25519.PrivateKey
+type privateKey ved25519.PrivateKey
 
 // Ed25519 33-byte address (the same as TypedPublicKey)
 type Address = crpt.Address
@@ -88,6 +117,47 @@ func (pub publicKey) Address() Address {
 	return Address(pub)
 }
 
+func (pub publicKey) Verify(message, digest []byte, hashFunc crypto.Hash, sig crpt.Signature,
+) (bool, error) {
+	if digest != nil && hashFunc.Available() {
+		return pub.VerifyDigest(digest, hashFunc, sig)
+	} else if message != nil {
+		return pub.VerifyMessage(message, sig)
+	} else {
+		return false, crpt.ErrEmptyMessage
+	}
+}
+
+func (pub publicKey) VerifyMessage(message []byte, sig crpt.Signature) (ok bool, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			ok = false
+			err = gerr.ToError(r)
+		}
+	}()
+	return ved25519.VerifyWithOptions(ved25519.PublicKey(pub), message, sig, notHashedOpts), nil
+}
+
+func (pub publicKey) VerifyDigest(digest []byte, hashFunc crypto.Hash, sig crpt.Signature,
+) (ok bool, err error) {
+	if !hashFunc.Available() {
+		return false, crpt.ErrInvalidHashFunc
+	}
+
+	defer func() {
+		if r := recover(); r != nil {
+			ok = false
+			err = gerr.ToError(r)
+		}
+	}()
+	return ved25519.VerifyWithOptions(ved25519.PublicKey(pub), digest, sig, &ved25519.Options{
+		Hash:            hashFunc,
+		Context:         optContext,
+		AddedRandomness: optAddedRandomness,
+		Verify:          optVerfiy,
+	}), nil
+}
+
 func (priv privateKey) KeyType() crpt.KeyType {
 	return crpt.Ed25519
 }
@@ -112,8 +182,37 @@ func (priv privateKey) TypedBytes() crpt.TypedPrivateKey {
 }
 
 func (priv privateKey) Public() crpt.PublicKey {
-	pub, _ := publicKeyFromBytes(ed25519.PrivateKey(priv).Public().(ed25519.PublicKey))
+	pub, _ := publicKeyFromBytes(ved25519.PrivateKey(priv).Public().(ved25519.PublicKey))
 	return pub
+}
+
+func (priv privateKey) Sign(message, digest []byte, hashFunc crypto.Hash, rand io.Reader,
+) (crpt.Signature, error) {
+	if digest != nil && hashFunc.Available() {
+		return priv.SignDigest(digest, hashFunc, rand)
+	} else if message != nil {
+		return priv.SignMessage(message, rand)
+	} else {
+		return nil, crpt.ErrEmptyMessage
+	}
+}
+
+func (priv privateKey) SignMessage(message []byte, rand io.Reader) (crpt.Signature, error) {
+	return ved25519.PrivateKey(priv).Sign(rand, message, notHashedOpts)
+}
+
+func (priv privateKey) SignDigest(digest []byte, hashFunc crypto.Hash, rand io.Reader,
+) (crpt.Signature, error) {
+	if !hashFunc.Available() {
+		return nil, crpt.ErrInvalidHashFunc
+	}
+
+	return ved25519.PrivateKey(priv).Sign(rand, digest, &ved25519.Options{
+		Hash:            hashFunc,
+		Context:         optContext,
+		AddedRandomness: optAddedRandomness,
+		Verify:          optVerfiy,
+	})
 }
 
 // New creates an Ed225519 Crpt.
@@ -177,28 +276,59 @@ func (c *ed25519Crpt) GenerateKey(rand io.Reader,
 	return cpub, cpriv, err
 }
 
+func (c *ed25519Crpt) Sign(
+	priv crpt.PrivateKey, message, digest []byte, hashFunc crypto.Hash, rand io.Reader,
+) (crpt.Signature, error) {
+	if edpriv, ok := priv.(privateKey); !ok {
+		return nil, ErrNotEd25519PrivateKey
+	} else {
+		return edpriv.Sign(message, digest, hashFunc, rand)
+	}
+}
+
 func (c *ed25519Crpt) SignMessage(priv crpt.PrivateKey, message []byte, rand io.Reader,
 ) (crpt.Signature, error) {
-	if edpriv, ok := priv.(privateKey); ok {
-		return ed25519.Sign(edpriv.Bytes(), message), nil
-	} else {
+	if edpriv, ok := priv.(privateKey); !ok {
 		return nil, ErrNotEd25519PrivateKey
+	} else {
+		return edpriv.SignMessage(message, rand)
 	}
 }
 
 func (c *ed25519Crpt) SignDigest(priv crpt.PrivateKey, digest []byte, hashFunc crypto.Hash, rand io.Reader,
 ) (crpt.Signature, error) {
-	panic("not supported: Ed25519 cannot handle pre-hashed messages, " +
-		"see: https://pkg.go.dev/crypto/ed25519#PrivateKey.Sign")
+	if edpriv, ok := priv.(privateKey); !ok {
+		return nil, ErrNotEd25519PrivateKey
+	} else {
+		return edpriv.SignDigest(digest, hashFunc, rand)
+	}
 }
 
-func (c *ed25519Crpt) Verify(pub crpt.PublicKey, message []byte, sig crpt.Signature,
+func (c *ed25519Crpt) Verify(
+	pub crpt.PublicKey, message, digest []byte, hashFunc crypto.Hash, sig crpt.Signature,
 ) (bool, error) {
 	if edpub, ok := pub.(publicKey); !ok {
 		return false, ErrNotEd25519PublicKey
 	} else {
-		// This implementation has defined criteria (ZIP 215) for signature validity
-		return ed25519consensus.Verify(edpub.Bytes(), message, sig), nil
-		//return ed25519.Verify(ed25519.PublicKey(edpub), message, sig), nil
+		return edpub.Verify(message, digest, hashFunc, sig)
+	}
+}
+
+func (c *ed25519Crpt) VerifyMessage(pub crpt.PublicKey, message []byte, sig crpt.Signature,
+) (bool, error) {
+	if edpub, ok := pub.(publicKey); !ok {
+		return false, ErrNotEd25519PublicKey
+	} else {
+		return edpub.VerifyMessage(message, sig)
+	}
+}
+
+func (c *ed25519Crpt) VerifyDigest(
+	pub crpt.PublicKey, digest []byte, hashFunc crypto.Hash, sig crpt.Signature,
+) (bool, error) {
+	if edpub, ok := pub.(publicKey); !ok {
+		return false, ErrNotEd25519PublicKey
+	} else {
+		return edpub.VerifyDigest(digest, hashFunc, sig)
 	}
 }

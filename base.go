@@ -33,8 +33,8 @@ type BaseCrpt struct {
 	parentCrpt Crpt
 }
 
-func NewBaseCrpt(t KeyType, hashFunc crypto.Hash, canSignPreHashedMessages bool,
-	parentCrpt Crpt) (*BaseCrpt, error) {
+func NewBaseCrpt(t KeyType, hashFunc crypto.Hash, canSignPreHashedMessages bool, parentCrpt Crpt,
+) (*BaseCrpt, error) {
 	if hashFunc != 0 && !hashFunc.Available() {
 		panic("crypto: requested hash function #" + strconv.Itoa(int(hashFunc)) + " is unavailable")
 	}
