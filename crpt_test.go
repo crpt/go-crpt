@@ -16,4 +16,8 @@ func TestCrpt(t *testing.T) {
 	t.Run("XxxFromBytes, SignXxx, Verify", func(t *testing.T) {
 		test.Test_XxxFromBytes_SignXxx_Verify(t, nil, test.TestEd25519PrivateKeyTyped, Ed25519)
 	})
+
+	t.Run("Batch", func(t *testing.T) {
+		test.Test_Batch(t, nil, Ed25519)
+	})
 }
