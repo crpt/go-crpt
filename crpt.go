@@ -166,7 +166,7 @@ type TypedSignature []byte
 
 // Address represents an address derived from a PublicKey.
 // An address is a []byte, but hex-encoded even in JSON.
-type Address gbytes.HexBytes
+type Address = gbytes.HexBytes
 
 // Hash represents a hash.
 type Hash []byte
