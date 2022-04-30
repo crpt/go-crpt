@@ -14,8 +14,9 @@ import (
 	"crypto/subtle"
 	"errors"
 	"fmt"
-	"github.com/oasisprotocol/curve25519-voi/primitives/ed25519/extra/cache"
 	"io"
+
+	"github.com/oasisprotocol/curve25519-voi/primitives/ed25519/extra/cache"
 
 	gerr "github.com/daotl/guts/error"
 	ved25519 "github.com/oasisprotocol/curve25519-voi/primitives/ed25519"
@@ -122,7 +123,7 @@ func (pub PublicKey) TypedBytes() crpt.TypedPublicKey {
 	k := make([]byte, PublicKeySize+1)
 	k[0] = KeyTypeByte
 	copy(k[1:PublicKeySize+1], pub)
-	return crpt.TypedPublicKey(pub)
+	return crpt.TypedPublicKey(k)
 }
 
 // Address returns TypedPublicKey instead of deriving address from the public key by hashing and
@@ -206,7 +207,7 @@ func (priv PrivateKey) TypedBytes() crpt.TypedPrivateKey {
 	k := make([]byte, PrivateKeySize+1)
 	k[0] = KeyTypeByte
 	copy(k[1:PrivateKeySize+1], priv)
-	return crpt.TypedPrivateKey(priv)
+	return crpt.TypedPrivateKey(k)
 }
 
 // Panics if the private key is not initialized.
