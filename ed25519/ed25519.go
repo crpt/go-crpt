@@ -9,7 +9,6 @@
 package ed25519
 
 import (
-	"bytes"
 	"crypto"
 	"crypto/subtle"
 	"errors"
@@ -103,11 +102,12 @@ func (pub PublicKey) KeyType() crpt.KeyType {
 	return KeyType
 }
 
+// Runs in constant time based on length of the keys to prevent time attacks.
 func (pub PublicKey) Equal(o crpt.PublicKey) bool {
 	if oed, ok := o.(PublicKey); !ok {
 		return false
 	} else {
-		return bytes.Equal(pub, oed)
+		return subtle.ConstantTimeCompare(pub, oed) == 1
 	}
 }
 

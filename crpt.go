@@ -6,15 +6,15 @@
 package crpt
 
 import (
-	"bytes"
 	"crypto"
 	"crypto/subtle"
 	"errors"
+	"hash"
+	"io"
+
 	"github.com/crpt/go-merkle"
 	gbytes "github.com/daotl/guts/bytes"
 	"github.com/multiformats/go-multihash"
-	"hash"
-	"io"
 )
 
 type KeyType uint8
@@ -42,7 +42,7 @@ var (
 	ErrEmptyMessage         = errors.New("message is empty")
 	ErrInvalidHashFunc      = errors.New("invalid hash function")
 	ErrNoMatchingCryptoHash = errors.New("no matching crypto.Hash exists")
-	//ErrNoMatchingMultihash  = errors.New("no matching multihash exists")
+	// ErrNoMatchingMultihash  = errors.New("no matching multihash exists")
 )
 
 // PublicKey represents a public key with a specific key type.
@@ -290,8 +290,12 @@ func (sig Signature) Equal(o Signature) bool {
 }
 
 // Equal reports whether this key is equal to another key.
+// Runs in constant time based on length of the keys to prevent time attacks.
 func (pub TypedPublicKey) Equal(o TypedPublicKey) bool {
-	return bytes.Equal(pub, o)
+	if len(pub) != len(o) {
+		return false
+	}
+	return subtle.ConstantTimeCompare(pub, o) == 1
 }
 
 // Raw return the raw bytes of the public key without the 1-byte key type prefix.
@@ -305,6 +309,9 @@ func (pub TypedPublicKey) Raw() []byte {
 // Equal reports whether this key is equal to another key.
 // Runs in constant time based on length of the keys to prevent time attacks.
 func (priv TypedPrivateKey) Equal(o TypedPrivateKey) bool {
+	if len(priv) != len(o) {
+		return false
+	}
 	return subtle.ConstantTimeCompare(priv, o) == 1
 }
 
@@ -317,8 +324,12 @@ func (priv TypedPrivateKey) Raw() []byte {
 }
 
 // Equal reports whether this hash is equal to another hash.
+// Runs in constant time based on length of the keys to prevent time attacks.
 func (h TypedHash) Equal(o TypedHash) bool {
-	return bytes.Equal(h, o)
+	if len(h) != len(o) {
+		return false
+	}
+	return subtle.ConstantTimeCompare(h, o) == 1
 }
 
 // HashToTyped decorates a hash into a TypedHash with crypto.Hash.
