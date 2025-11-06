@@ -94,6 +94,7 @@ func (c *BaseCrpt) SumHashTyped(h hash.Hash, b []byte) []byte {
 func (c *BaseCrpt) HashToTyped(h Hash) TypedHash {
 	ht := make([]byte, len(h))
 	ht[0] = c.hashFuncByte
+	copy(ht[1:], h[1:])
 	return ht
 }
 
