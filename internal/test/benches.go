@@ -5,8 +5,9 @@
 package test
 
 import (
-	"github.com/crpt/go-crpt"
 	"testing"
+
+	"github.com/crpt/go-crpt"
 )
 
 func BenchmarkSignMessage(b *testing.B, c crpt.Crpt, privateKey []byte, kt crpt.KeyType) {

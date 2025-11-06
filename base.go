@@ -36,7 +36,7 @@ type BaseCrpt struct {
 func NewBaseCrpt(t KeyType, hashFunc crypto.Hash, canSignPreHashedMessages bool, parentCrpt Crpt,
 ) (*BaseCrpt, error) {
 	if hashFunc != 0 && !hashFunc.Available() {
-		panic("crypto: requested hash function #" + strconv.Itoa(int(hashFunc)) + " is unavailable")
+		panic("crypto: requested hash function #" + strconv.FormatInt(int64(hashFunc), 10) + " is unavailable")
 	}
 	if parentCrpt == nil {
 		panic("implementations should always pass parentCrpt")
