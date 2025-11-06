@@ -308,7 +308,7 @@ func (c *ed25519Crpt) SignatureToTyped(sig crpt.Signature) (crpt.TypedSignature,
 	}
 	ts := make([]byte, SignatureSize+1)
 	ts[0] = KeyTypeByte
-	copy(ts[1:], ts)
+	copy(ts[1:], sig)
 	return ts, nil
 }
 
