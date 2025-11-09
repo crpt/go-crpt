@@ -254,6 +254,9 @@ type Crpt interface {
 	// PrivateKeyFromBytes constructs a PrivateKey from raw bytes.
 	PrivateKeyFromBytes(priv []byte) (PrivateKey, error)
 
+	// SignatureToASN1 converts a Signature to ASN.1 DER encoding.
+	SignatureToASN1(sig Signature) ([]byte, error)
+
 	// SignatureToTyped decorates a Signature into a TypedSignature.
 	SignatureToTyped(sig Signature) (TypedSignature, error)
 
@@ -351,6 +354,14 @@ func PrivateKeyFromTyped(priv Typed[PrivateKey]) (PrivateKey, error) {
 		return nil, ErrWrongPublicKeySize
 	}
 	return PrivateKeyFromBytes(KeyType(priv[0]), priv[1:])
+}
+
+// SignatureToASN1 converts a Signature to ASN.1 DER encoding.
+func SignatureToASN1(t KeyType, sig Signature) ([]byte, error) {
+	if !t.Available() {
+		return nil, ErrKeyTypeNotSupported
+	}
+	return crpts[t].SignatureToASN1(sig)
 }
 
 // SignatureToTyped decorates a Signature into a TypedSignature.

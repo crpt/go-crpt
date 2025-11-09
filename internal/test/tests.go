@@ -112,6 +112,13 @@ func Test_XxxFromBytes_SignXxx_Verify(t *testing.T, c crpt.Crpt, privateKey []by
 	}
 	assr.ErrorIs(err, crpt.ErrWrongSignatureSize)
 
+	if c != nil {
+		_, err = c.SignatureToASN1(TestWrongData)
+	} else {
+		_, err = crpt.SignatureToASN1(kt, TestWrongData)
+	}
+	assr.ErrorIs(err, crpt.ErrWrongSignatureSize)
+
 	var sig, sig2, sig_ crpt.Signature
 	if c != nil {
 		sig, err = priv.Sign(TestMsg, nil, crpt.NotHashed, nil)
@@ -198,5 +205,111 @@ func Test_Batch(t *testing.T, c crpt.Crpt, kt crpt.KeyType) {
 	}
 
 	ok, _ = v.Verify(nil)
+	req.True(ok)
+}
+
+func Test_SignatureToASN1(t *testing.T, c crpt.Crpt, kt crpt.KeyType) {
+	req := require.New(t)
+	assr := assert.New(t)
+
+	// Generate key pair
+	var pub crpt.PublicKey
+	var priv crpt.PrivateKey
+	var err error
+	if c != nil {
+		pub, priv, err = c.GenerateKey(nil)
+	} else {
+		pub, priv, err = crpt.GenerateKey(kt, nil)
+	}
+	req.NoError(err)
+
+	// Test with a valid signature
+	var sig crpt.Signature
+	if c != nil {
+		sig, err = priv.SignMessage(TestMsg, nil)
+	} else {
+		sig, err = priv.SignMessage(TestMsg, nil)
+	}
+	req.NoError(err)
+
+	// Test ASN.1 conversion
+	var asn1Bytes []byte
+	if c != nil {
+		asn1Bytes, err = c.SignatureToASN1(sig)
+	} else {
+		asn1Bytes, err = crpt.SignatureToASN1(kt, sig)
+	}
+	req.NoError(err)
+	req.NotNil(asn1Bytes)
+
+	// ASN.1 encoded signature should be longer than raw signature
+	// due to OCTET STRING wrapper
+	assr.Greater(len(asn1Bytes), len(sig))
+
+	// The ASN.1 encoding should start with OCTET STRING tag (0x04)
+	assr.Equal(byte(0x04), asn1Bytes[0])
+
+	// For Ed25519 (64 bytes): OCTET STRING (0x04) + length (1 byte) + 64 bytes signature
+	if kt == crpt.Ed25519 {
+		expectedLength := 66 // 1 (tag) + 1 (length) + 64 (signature)
+		assr.Equal(expectedLength, len(asn1Bytes))
+		assr.Equal(byte(64), asn1Bytes[1]) // Length field
+		assr.Equal([]byte(sig), asn1Bytes[2:]) // The signature itself
+	}
+
+	// Test that multiple different signatures produce valid ASN.1 encodings
+	testMessages := [][]byte{
+		{0x01},
+		{0x01, 0x02},
+		{0x01, 0x02, 0x03},
+		TestMsg2,
+	}
+
+	for i, msg := range testMessages {
+		var testSig crpt.Signature
+		if c != nil {
+			testSig, err = priv.SignMessage(msg, nil)
+		} else {
+			testSig, err = priv.SignMessage(msg, nil)
+		}
+		req.NoError(err)
+
+		var testAsn1Bytes []byte
+		if c != nil {
+			testAsn1Bytes, err = c.SignatureToASN1(testSig)
+		} else {
+			testAsn1Bytes, err = crpt.SignatureToASN1(kt, testSig)
+		}
+		req.NoError(err)
+
+		// Each should have the correct structure
+		assr.Greater(len(testAsn1Bytes), len(testSig))
+		assr.Equal(byte(0x04), testAsn1Bytes[0])
+
+		// Different signatures should produce different ASN.1 encodings (except for structure)
+		if i == 0 {
+			// First signature: just verify it's not empty
+			assr.NotEmpty(testAsn1Bytes)
+		} else {
+			// Different signatures should have different content in the payload
+			// (but same overall length and structure)
+			assr.Equal(len(asn1Bytes), len(testAsn1Bytes))
+		}
+	}
+
+	// Test deterministic encoding: same signature should produce same ASN.1 encoding
+	var asn1Bytes2 []byte
+	if c != nil {
+		asn1Bytes2, err = c.SignatureToASN1(sig)
+	} else {
+		asn1Bytes2, err = crpt.SignatureToASN1(kt, sig)
+	}
+	req.NoError(err)
+	assr.Equal(asn1Bytes, asn1Bytes2)
+
+	// Test that ASN.1 conversion doesn't affect signature verification
+	// The original signature should still be valid
+	ok, err := pub.VerifyMessage(TestMsg, sig)
+	req.NoError(err)
 	req.True(ok)
 }

@@ -11,6 +11,7 @@ package ed25519
 import (
 	"crypto"
 	"crypto/subtle"
+	"encoding/asn1"
 	"errors"
 	"fmt"
 	"io"
@@ -278,6 +279,16 @@ func (c *ed25519Crpt) PublicKeyFromBytes(pub []byte) (crpt.PublicKey, error) {
 
 func (c *ed25519Crpt) PrivateKeyFromBytes(priv []byte) (crpt.PrivateKey, error) {
 	return NewPrivateKey(priv)
+}
+
+// SignatureToASN1 converts an Ed25519 signature to ASN.1 DER encoding.
+// For Ed25519, this encodes the 64-byte signature as an OCTET STRING.
+func (c *ed25519Crpt) SignatureToASN1(sig crpt.Signature) ([]byte, error) {
+	if len(sig) != SignatureSize {
+		return nil, ErrWrongSignatureSize
+	}
+	// Ed25519 signatures are encoded as OCTET STRING in ASN.1
+	return asn1.Marshal(sig)
 }
 
 // SignatureToTyped's returned byte slice is not safe to modify because it returns the underlying

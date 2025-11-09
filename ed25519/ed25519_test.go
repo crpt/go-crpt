@@ -45,6 +45,10 @@ func TestEd25519Crpt(t *testing.T) {
 	t.Run("Batch", func(t *testing.T) {
 		test.Test_Batch(t, c, crpt.Ed25519)
 	})
+
+	t.Run("SignatureToASN1", func(t *testing.T) {
+		test.Test_SignatureToASN1(t, c, crpt.Ed25519)
+	})
 }
 
 func TestEd25519_Comprehensive(t *testing.T) {
@@ -377,6 +381,115 @@ func TestEd25519_LargeMessageSigning(t *testing.T) {
 	}
 }
 
+func TestEd25519_SignatureToASN1(t *testing.T) {
+	c, err := New(crypto.SHA512)
+	require.NoError(t, err)
+
+	_, priv, err := c.GenerateKey(rand.Reader)
+	require.NoError(t, err)
+
+	message := []byte("test message for ASN.1 encoding")
+
+	// Create a signature
+	sig, err := priv.SignMessage(message, rand.Reader)
+	require.NoError(t, err)
+	require.Len(t, sig, 64)
+
+	t.Run("Valid signature conversion", func(t *testing.T) {
+		asn1Bytes, err := c.SignatureToASN1(sig)
+		require.NoError(t, err)
+		require.NotNil(t, asn1Bytes)
+
+		// ASN.1 encoding should be longer than raw signature due to OCTET STRING wrapper
+		assert.Greater(t, len(asn1Bytes), len(sig))
+
+		// The ASN.1 encoding should start with OCTET STRING tag (0x04)
+		assert.Equal(t, byte(0x04), asn1Bytes[0])
+
+		// Verify the encoded signature length matches the length field
+		// For Ed25519: OCTET STRING (0x04) + length (1 byte) + 64 bytes signature
+		expectedLength := 66 // 1 (tag) + 1 (length) + 64 (signature)
+		assert.Equal(t, expectedLength, len(asn1Bytes))
+		assert.Equal(t, byte(64), asn1Bytes[1]) // Length field
+		assert.Equal(t, []byte(sig), asn1Bytes[2:]) // The signature itself
+	})
+
+	t.Run("Global function test", func(t *testing.T) {
+		asn1Bytes, err := crpt.SignatureToASN1(crpt.Ed25519, sig)
+		require.NoError(t, err)
+		require.NotNil(t, asn1Bytes)
+
+		// Should match the instance method result
+		asn1Bytes2, err := c.SignatureToASN1(sig)
+		require.NoError(t, err)
+		require.Equal(t, asn1Bytes, asn1Bytes2)
+	})
+
+	t.Run("Invalid signature sizes", func(t *testing.T) {
+		// Test with various invalid signature sizes
+		invalidSizes := []int{0, 1, 31, 63, 65, 128}
+		for _, size := range invalidSizes {
+			invalidSig := make([]byte, size)
+			rand.Read(invalidSig)
+
+			asn1Bytes, err := c.SignatureToASN1(invalidSig)
+			require.Error(t, err)
+			require.Nil(t, asn1Bytes)
+			require.ErrorIs(t, err, ErrWrongSignatureSize)
+		}
+	})
+
+	t.Run("Multiple signatures", func(t *testing.T) {
+		// Test converting multiple different signatures
+		for i := 0; i < 10; i++ {
+			message := []byte(fmt.Sprintf("test message %d", i))
+			sig, err := priv.SignMessage(message, rand.Reader)
+			require.NoError(t, err)
+
+			asn1Bytes, err := c.SignatureToASN1(sig)
+			require.NoError(t, err)
+
+			// Each signature should produce different ASN.1 encoding
+			// (but same structure)
+			assert.Greater(t, len(asn1Bytes), len(sig))
+		}
+	})
+
+	t.Run("Concurrent conversions", func(t *testing.T) {
+		const numGoroutines = 10
+		const conversionsPerGoroutine = 100
+
+		done := make(chan bool, numGoroutines)
+		for i := 0; i < numGoroutines; i++ {
+			go func() {
+				defer func() { done <- true }()
+				for j := 0; j < conversionsPerGoroutine; j++ {
+					asn1Bytes, err := c.SignatureToASN1(sig)
+					require.NoError(t, err)
+					require.NotNil(t, asn1Bytes)
+					assert.Greater(t, len(asn1Bytes), len(sig))
+				}
+			}()
+		}
+
+		// Wait for all goroutines to complete
+		for i := 0; i < numGoroutines; i++ {
+			<-done
+		}
+	})
+
+	t.Run("Deterministic encoding", func(t *testing.T) {
+		// ASN.1 DER encoding should be deterministic for the same input
+		asn1Bytes1, err := c.SignatureToASN1(sig)
+		require.NoError(t, err)
+
+		asn1Bytes2, err := c.SignatureToASN1(sig)
+		require.NoError(t, err)
+
+		assert.Equal(t, asn1Bytes1, asn1Bytes2)
+	})
+}
+
 func TestEd25519_MemoryUsage(t *testing.T) {
 	c, err := New(crypto.SHA512)
 	require.NoError(t, err)
@@ -402,6 +515,7 @@ func TestEd25519_MemoryUsage(t *testing.T) {
 		_ = pub.ToTyped()
 		_ = priv.ToTyped()
 		_, _ = c.SignatureToTyped(sig)
+		_, _ = c.SignatureToASN1(sig)
 	}
 }
 
@@ -626,6 +740,55 @@ func BenchmarkEd25519_ConcurrentOperations(b *testing.B) {
 				b.Fatal("verification failed")
 			}
 			i++
+		}
+	})
+}
+
+func BenchmarkEd25519_SignatureToASN1(b *testing.B) {
+	c, err := New(crypto.SHA256)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	_, priv, err := c.GenerateKey(rand.Reader)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	// Generate a test signature
+	message := []byte("benchmark message")
+	sig, err := priv.SignMessage(message, rand.Reader)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	b.Run("SignatureToASN1", func(b *testing.B) {
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			_, err := c.SignatureToASN1(sig)
+			if err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
+
+	b.Run("SignatureToTyped", func(b *testing.B) {
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			_, err := c.SignatureToTyped(sig)
+			if err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
+
+	b.Run("GlobalSignatureToASN1", func(b *testing.B) {
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			_, err := crpt.SignatureToASN1(crpt.Ed25519, sig)
+			if err != nil {
+				b.Fatal(err)
+			}
 		}
 	})
 }

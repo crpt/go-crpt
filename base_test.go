@@ -53,6 +53,10 @@ func (m *mockCrpt) PrivateKeyFromBytes(b []byte) (PrivateKey, error) {
 	return nil, nil
 }
 
+func (m *mockCrpt) SignatureToASN1(sig Signature) ([]byte, error) {
+	return nil, nil
+}
+
 func (m *mockCrpt) SignatureToTyped(sig Signature) (TypedSignature, error) {
 	return nil, nil
 }
