@@ -103,10 +103,10 @@ func TestBatchVerifierFunctionality(t *testing.T) {
 	message1 := []byte("test message 1")
 	message2 := []byte("test message 2")
 
-	sig1, err := crypt.SignMessage(priv1, message1, nil)
+	sig1, err := priv1.SignMessage(message1, nil)
 	require.NoError(t, err)
 
-	sig2, err := crypt.SignMessage(priv2, message2, nil)
+	sig2, err := priv2.SignMessage(message2, nil)
 	require.NoError(t, err)
 
 	// Add signatures to batch verifier
@@ -136,7 +136,7 @@ func TestBatchVerifierInvalidSignature(t *testing.T) {
 	require.NoError(t, err)
 
 	message := []byte("test message")
-	sig, err := crypt.SignMessage(priv, message, nil)
+	sig, err := priv.SignMessage(message, nil)
 	require.NoError(t, err)
 
 	// Add valid signature
@@ -175,7 +175,7 @@ func BenchmarkBatchVerifier(b *testing.B) {
 		pubs[i] = pub
 		privs[i] = priv
 		messages[i] = []byte("benchmark message")
-		signatures[i], err = crypt.SignMessage(priv, messages[i], nil)
+		signatures[i], err = priv.SignMessage(messages[i], nil)
 		if err != nil {
 			b.Fatal(err)
 		}

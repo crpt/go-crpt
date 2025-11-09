@@ -45,26 +45,67 @@ var (
 	// ErrNoMatchingMultihash  = errors.New("no matching multihash exists")
 )
 
-// PublicKey represents a public key with a specific key type.
-type PublicKey interface {
-	// KeyType returns the key type.
-	KeyType() KeyType
-
-	// Equal reports whether this key is equal to another key.
+// Untyped is the minimal common interface for the following crpt objects: PublicKey, PrivateKey, Signature
+type Untyped[T any] interface {
+	// Equal reports whether this key or signature is equal to another one.
 	// Runs in constant time based on length of the keys to prevent time attacks.
-	Equal(PublicKey) bool
+	Equal(T) bool
 
-	// Bytes returns the bytes representation of the public key.
+	// Bytes returns the bytes representation of the key or the signature.
 	//
 	// NOTE: It's not safe to modify the returned slice because the implementations most likely
 	// return the underlying byte slice directly for the performance reason. Copy it if you need to modify.
 	Bytes() []byte
+}
 
-	// TypedBytes returns the TypedPublicKey bytes representation of the public key.
-	//
-	// NOTE: It's not safe to modify the returned slice because the implementations most likely
-	// return the underlying byte slice directly for the performance reason. Copy it if you need to modify.
-	TypedBytes() TypedPublicKey
+// Typed representations of the following crpt objects: PublicKey, PrivateKey, Signature, consists of 1-byte KeyType concatenated with its bytes representation.
+type Typed[T any] []byte
+
+// KeyType returns the key type.
+func (t Typed[T]) KeyType() KeyType {
+	return KeyType(t[0])
+}
+
+// Equal reports whether this key or signature is equal to another one.
+// Runs in constant time based on length of the keys to prevent time attacks.
+func (t Typed[T]) Equal(t2 Typed[T]) bool {
+	if len(t) != len(t2) {
+		return false
+	}
+	return subtle.ConstantTimeCompare(t, t2) == 1
+}
+
+// Raw return the raw bytes of the the following typed crpt objects: PublicKey, PrivateKey, Signature
+//
+// The returned byte slice is not safe to modify because it returns the underlying byte slice
+// directly for the performance reason. Copy it if you need to modify.
+func (t Typed[T]) Raw() []byte {
+	return t[1:]
+}
+
+// ToTyped returns the typed bytes representation of Untyped (PublicKey, PrivateKey, Signature).
+func ToTyped[T any](u Untyped[T], t KeyType) []byte {
+	ub := u.Bytes()
+	b := make([]byte, len(ub)+1)
+	b[0] = byte(t)
+	copy(b[1:], ub)
+	return b
+}
+
+// UntypedKey is the common interface for PublicKey and PrivateKey
+type UntypedKey[T any] interface {
+	Untyped[T]
+
+	// KeyType returns the key type.
+	KeyType() KeyType
+
+	// ToTyped returns the typed bytes representation of the key.
+	ToTyped() Typed[T]
+}
+
+// PublicKey represents a public key with a specific key type.
+type PublicKey interface {
+	UntypedKey[PublicKey]
 
 	// Address returns the address derived from the public key.
 	//
@@ -100,24 +141,7 @@ type PublicKey interface {
 
 // PrivateKey represents a private key with a specific key type.
 type PrivateKey interface {
-	// KeyType returns the key type.
-	KeyType() KeyType
-
-	// Equal reports whether this key is equal to another key.
-	// Runs in constant time based on length of the keys to prevent time attacks.
-	Equal(PrivateKey) bool
-
-	// Bytes returns the bytes representation of the private key.
-	//
-	// NOTE: It's not safe to modify the returned slice because the implementations most likely
-	// return the underlying byte slice directly for the performance reason. Copy it if you need to modify.
-	Bytes() []byte
-
-	// TypedBytes returns the TypedPrivateKey bytes representation of the private key.
-	//
-	// NOTE: It's not safe to modify the returned slice because the implementations most likely
-	// return the underlying byte slice directly for the performance reason. Copy it if you need to modify.
-	TypedBytes() TypedPrivateKey
+	UntypedKey[PrivateKey]
 
 	// Public returns the public key corresponding to the private key.
 	//
@@ -154,11 +178,25 @@ type PrivateKey interface {
 // Signature represents a digital signature produced by signing a message.
 type Signature []byte
 
-// TypedPublicKey consists of 1-byte KeyType of a PublicKey concatenated with its bytes representation.
-type TypedPublicKey []byte
+// Type check
+var _ Untyped[Signature] = Signature(nil)
 
-// TypedPrivateKey consists of 1-byte KeyType of a PrivateKey concatenated with its bytes representation.
-type TypedPrivateKey []byte
+// Equal reports whether this signature is equal to another one.
+// Runs in constant time based on length of the keys to prevent time attacks.
+func (sig Signature) Equal(o Signature) bool {
+	if len(sig) != len(o) {
+		return false
+	}
+	return subtle.ConstantTimeCompare(sig, o.Bytes()) == 1
+}
+
+// Bytes returns the bytes representation of the key or the signature.
+//
+// NOTE: It's not safe to modify the returned slice because the implementations most likely
+// return the underlying byte slice directly for the performance reason. Copy it if you need to modify.
+func (sig Signature) Bytes() []byte {
+	return sig
+}
 
 // TypedSignature consists of 1-byte representation of crypto.Hash used as uint8 concatenated with
 // the signature's bytes representation.
@@ -222,36 +260,6 @@ type Crpt interface {
 	// GenerateKey generates a public/private key pair using entropy from rand.
 	GenerateKey(rand io.Reader) (PublicKey, PrivateKey, error)
 
-	// Sign signs message or digest and returns a Signature, possibly using entropy from rand.
-	//
-	// See PrivateKey.Sign for more details.
-	Sign(priv PrivateKey, message, digest []byte, hashFunc crypto.Hash, rand io.Reader) (Signature, error)
-
-	// SignMessage directly signs message with `priv`, possibly using entropy from rand.
-	//
-	// See PrivateKey.SignMessage for more details.
-	SignMessage(priv PrivateKey, message []byte, rand io.Reader) (Signature, error)
-
-	// SignDigest signs digest with `priv` and returns a Signature, possibly using entropy from rand.
-	//
-	// See PrivateKey.SignDigest for more details.
-	SignDigest(priv PrivateKey, digest []byte, hashFunc crypto.Hash, rand io.Reader) (Signature, error)
-
-	// Verify reports whether `sig` is a valid signature of message or digest by `pub`.
-	//
-	// See PublicKey.Verify for more details.
-	Verify(pub PublicKey, message, digest []byte, hashFunc crypto.Hash, sig Signature) (bool, error)
-
-	// VerifyMessage reports whether `sig` is a valid signature of message by `pub`.
-	//
-	// See PublicKey.VerifyMessage for more details.
-	VerifyMessage(pub PublicKey, message []byte, sig Signature) (bool, error)
-
-	// VerifyDigest reports whether `sig` is a valid signature of digest by `pub`.
-	//
-	// See PublicKey.VerifyDigest for more details.
-	VerifyDigest(pub PublicKey, digest []byte, hashFunc crypto.Hash, sig Signature) (bool, error)
-
 	// MerkleHashFromByteSlices computes a Merkle tree where the leaves are the byte slice,
 	// in the provided order. It follows RFC-6962.
 	MerkleHashFromByteSlices(items [][]byte) (rootHash []byte)
@@ -281,46 +289,6 @@ func RegisterCrpt(t KeyType, c Crpt) {
 		panic("crypto: RegisterCrpt of unknown Crpt implementation")
 	}
 	crpts[t] = c
-}
-
-// Equal reports whether this signature is equal to another one.
-// Runs in constant time based on length of the keys to prevent time attacks.
-func (sig Signature) Equal(o Signature) bool {
-	return subtle.ConstantTimeCompare(sig, o) == 1
-}
-
-// Equal reports whether this key is equal to another key.
-// Runs in constant time based on length of the keys to prevent time attacks.
-func (pub TypedPublicKey) Equal(o TypedPublicKey) bool {
-	if len(pub) != len(o) {
-		return false
-	}
-	return subtle.ConstantTimeCompare(pub, o) == 1
-}
-
-// Raw return the raw bytes of the public key without the 1-byte key type prefix.
-//
-// The returned byte slice is not safe to modify because it returns the underlying byte slice
-// directly for the performance reason. Copy it if you need to modify.
-func (pub TypedPublicKey) Raw() []byte {
-	return pub[1:]
-}
-
-// Equal reports whether this key is equal to another key.
-// Runs in constant time based on length of the keys to prevent time attacks.
-func (priv TypedPrivateKey) Equal(o TypedPrivateKey) bool {
-	if len(priv) != len(o) {
-		return false
-	}
-	return subtle.ConstantTimeCompare(priv, o) == 1
-}
-
-// Raw return the raw bytes of the private key without the 1-byte key type prefix.
-//
-// The returned byte slice is not safe to modify because it returns the underlying byte slice
-// directly for the performance reason. Copy it if you need to modify.
-func (priv TypedPrivateKey) Raw() []byte {
-	return priv[1:]
 }
 
 // Equal reports whether this hash is equal to another hash.
@@ -361,8 +329,11 @@ func PublicKeyFromBytes(t KeyType, pub []byte) (PublicKey, error) {
 	return crpts[t].PublicKeyFromBytes(pub)
 }
 
-// PublicKeyFromTypedBytes constructs a PublicKey from its TypedPublicKey bytes representation.
-func PublicKeyFromTypedBytes(pub TypedPublicKey) (PublicKey, error) {
+// PublicKeyFromTyped constructs a PublicKey from its typed bytes representation.
+func PublicKeyFromTyped(pub Typed[PublicKey]) (PublicKey, error) {
+	if len(pub) == 0 {
+		return nil, ErrWrongPublicKeySize
+	}
 	return PublicKeyFromBytes(KeyType(pub[0]), pub[1:])
 }
 
@@ -374,8 +345,11 @@ func PrivateKeyFromBytes(t KeyType, priv []byte) (PrivateKey, error) {
 	return crpts[t].PrivateKeyFromBytes(priv)
 }
 
-// PrivateKeyFromTypedBytes constructs a PrivateKey from its TypedPrivateKey bytes representation.
-func PrivateKeyFromTypedBytes(priv TypedPrivateKey) (PrivateKey, error) {
+// PrivateKeyFromTyped constructs a PrivateKey from its typed bytes representation.
+func PrivateKeyFromTyped(priv Typed[PrivateKey]) (PrivateKey, error) {
+	if len(priv) == 0 {
+		return nil, ErrWrongPublicKeySize
+	}
 	return PrivateKeyFromBytes(KeyType(priv[0]), priv[1:])
 }
 

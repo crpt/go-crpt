@@ -8,13 +8,13 @@ import (
 	"bytes"
 	"crypto"
 	_ "crypto/sha512"
-	"fmt"
-	"github.com/crpt/go-crpt/batch"
 	"testing"
 
-	"github.com/crpt/go-crpt"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/crpt/go-crpt"
+	"github.com/crpt/go-crpt/batch"
 )
 
 func init() {
@@ -64,9 +64,8 @@ func Test_PrivateKey_PublicKey(t *testing.T, c crpt.Crpt) {
 
 	pub, priv, err := c.GenerateKey(nil)
 	req.NoError(err)
-	//fmt.Printf("%x", priv.Bytes())
-	//fmt.Println(base64.StdEncoding.EncodeToString(priv.Bytes()))
-	assr.ElementsMatch(pub, pub.Address())
+	// fmt.Printf("%x", priv.Bytes())
+	// fmt.Println(base64.StdEncoding.EncodeToString(priv.Bytes()))
 	assr.Equal(pub, priv.Public())
 
 	pub2, priv2, err := c.GenerateKey(nil)
@@ -74,8 +73,6 @@ func Test_PrivateKey_PublicKey(t *testing.T, c crpt.Crpt) {
 	assr.True(pub.Equal(pub))
 	assr.False(pub.Equal(pub2))
 	assr.False(pub2.Equal(pub))
-	e := priv.Equal(priv)
-	fmt.Println(e)
 	assr.True(priv.Equal(priv))
 	assr.False(priv.Equal(priv2))
 	assr.False(priv2.Equal(priv))
@@ -90,14 +87,14 @@ func Test_XxxFromBytes_SignXxx_Verify(t *testing.T, c crpt.Crpt, privateKey []by
 	if c != nil {
 		priv, err = c.PrivateKeyFromBytes(privateKey)
 	} else {
-		priv, err = crpt.PrivateKeyFromTypedBytes(privateKey)
+		priv, err = crpt.PrivateKeyFromTyped(privateKey)
 	}
 	req.NoError(err)
 
 	if c != nil {
 		_, err = c.PrivateKeyFromBytes(TestWrongData)
 	} else {
-		_, err = crpt.PrivateKeyFromTypedBytes(TestWrongData)
+		_, err = crpt.PrivateKeyFromTyped(TestWrongData)
 	}
 	assr.ErrorIs(err, crpt.ErrWrongPrivateKeySize)
 
@@ -117,86 +114,50 @@ func Test_XxxFromBytes_SignXxx_Verify(t *testing.T, c crpt.Crpt, privateKey []by
 
 	var sig, sig2, sig_ crpt.Signature
 	if c != nil {
-		sig, err = c.Sign(priv, TestMsg, nil, crpt.NotHashed, nil)
+		sig, err = priv.Sign(TestMsg, nil, crpt.NotHashed, nil)
 		req.NoError(err)
-		sig2, err = c.Sign(priv, TestMsg2, nil, crpt.NotHashed, nil)
+		sig2, err = priv.Sign(TestMsg2, nil, crpt.NotHashed, nil)
 		req.NoError(err)
 	} else {
-		sig, err = crpt.Sign(priv, TestMsg, nil, crpt.NotHashed, nil)
+		sig, err = priv.Sign(TestMsg, nil, crpt.NotHashed, nil)
 		req.NoError(err)
-		sig2, err = crpt.Sign(priv, TestMsg2, nil, crpt.NotHashed, nil)
+		sig2, err = priv.Sign(TestMsg2, nil, crpt.NotHashed, nil)
 		req.NoError(err)
 	}
 
-	if c != nil {
-		sig_, err = c.SignMessage(priv, TestMsg, nil)
-	} else {
-		sig_, err = crpt.SignMessage(priv, TestMsg, nil)
-	}
+	sig_, err = priv.SignMessage(TestMsg, nil)
 	req.NoError(err)
 	assr.Equal(sig, sig_)
 
-	if c != nil {
-		sig_, err = c.SignDigest(priv, TestDigest, TestHashFunc, nil)
-	} else {
-		sig_, err = crpt.SignDigest(priv, TestDigest, TestHashFunc, nil)
-	}
+	sig_, err = priv.SignDigest(TestDigest, TestHashFunc, nil)
 	req.NoError(err)
 
-	if c != nil {
-		_, err = c.SignDigest(priv, TestMsg, crpt.NotHashed, nil)
-	} else {
-		_, err = crpt.SignDigest(priv, TestMsg, crpt.NotHashed, nil)
-	}
+	_, err = priv.SignDigest(TestMsg, crpt.NotHashed, nil)
 	assr.ErrorIs(err, crpt.ErrInvalidHashFunc)
 
 	pub := priv.Public()
 	var ok bool
-	if c != nil {
-		ok, err = c.Verify(pub, TestMsg, nil, crpt.NotHashed, sig)
-	} else {
-		ok, err = crpt.Verify(pub, TestMsg, nil, crpt.NotHashed, sig)
-	}
+	ok, err = pub.Verify(TestMsg, nil, crpt.NotHashed, sig)
 	assr.NoError(err)
 	assr.True(ok)
 
-	if c != nil {
-		ok, err = c.Verify(pub, TestMsg, nil, crpt.NotHashed, sig2)
-	} else {
-		ok, err = crpt.Verify(pub, TestMsg, nil, crpt.NotHashed, sig2)
-	}
+	ok, err = pub.Verify(TestMsg, nil, crpt.NotHashed, sig2)
 	assr.NoError(err)
 	assr.False(ok)
 
-	if c != nil {
-		ok, err = c.VerifyMessage(pub, TestMsg, sig)
-	} else {
-		ok, err = crpt.VerifyMessage(pub, TestMsg, sig)
-	}
+	ok, err = pub.VerifyMessage(TestMsg, sig)
 	assr.NoError(err)
 	assr.True(ok)
 
-	if c != nil {
-		ok, err = c.VerifyMessage(pub, TestMsg, sig2)
-	} else {
-		ok, err = crpt.VerifyMessage(pub, TestMsg, sig2)
-	}
+	ok, err = pub.VerifyMessage(TestMsg, sig2)
 	assr.NoError(err)
 	assr.False(ok)
 
-	if c != nil {
-		ok, err = c.VerifyDigest(pub, TestDigest, TestHashFunc, sig_)
-	} else {
-		ok, err = crpt.VerifyDigest(pub, TestDigest, TestHashFunc, sig_)
-	}
+	ok, err = pub.VerifyDigest(TestDigest, TestHashFunc, sig_)
 	assr.NoError(err)
 	assr.True(ok)
 
-	if c != nil {
-		ok, err = c.VerifyDigest(pub, TestDigest, TestHashFunc, sig2)
-	} else {
-		ok, err = crpt.VerifyDigest(pub, TestDigest, TestHashFunc, sig2)
-	}
+	ok, err = pub.VerifyDigest(TestDigest, TestHashFunc, sig2)
 	assr.NoError(err)
 	assr.False(ok)
 }

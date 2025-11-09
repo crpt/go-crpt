@@ -13,6 +13,64 @@ import (
 	"github.com/crpt/go-merkle"
 )
 
+// BasePublicKey is a helper struct meant to be anonymously embedded by pointer in all
+// PublicKey implementations.
+type BasePublicKey struct {
+	Type KeyType
+	Pub  PublicKey
+}
+
+// KeyType returns the key type.
+func (pub BasePublicKey) KeyType() KeyType {
+	return pub.Type
+}
+
+// ToTyped returns the typed bytes representation of the public key.
+func (pub BasePublicKey) ToTyped() Typed[PublicKey] {
+	return ToTyped(pub.Pub, pub.KeyType())
+}
+
+// Verify reports whether `sig` is a valid signature of message or digest by the public key.
+func (pub BasePublicKey) Verify(message, digest []byte, hashFunc crypto.Hash, sig Signature,
+) (bool, error) {
+	if digest != nil && hashFunc.Available() {
+		return pub.Pub.VerifyDigest(digest, hashFunc, sig)
+	} else if message != nil {
+		return pub.Pub.VerifyMessage(message, sig)
+	} else {
+		return false, ErrEmptyMessage
+	}
+}
+
+// BasePrivateKey is a helper struct meant to be anonymously embedded by pointer in all
+// PrivateKey implementations.
+type BasePrivateKey struct {
+	Type KeyType
+	Priv PrivateKey
+}
+
+// KeyType returns the key type.
+func (priv BasePrivateKey) KeyType() KeyType {
+	return priv.Type
+}
+
+// ToTyped returns the typed bytes representation of the private key.
+func (priv BasePrivateKey) ToTyped() Typed[PrivateKey] {
+	return ToTyped(priv.Priv, priv.KeyType())
+}
+
+// Sign produces a signature on the provided message.
+func (priv BasePrivateKey) Sign(message, digest []byte, hashFunc crypto.Hash, rand io.Reader,
+) (Signature, error) {
+	if len(digest) > 0 && hashFunc.Available() {
+		return priv.Priv.SignDigest(digest, hashFunc, rand)
+	} else if len(message) > 0 {
+		return priv.Priv.SignMessage(message, rand)
+	} else {
+		return nil, ErrEmptyMessage
+	}
+}
+
 // BaseCrpt is a helper struct meant to be anonymously embedded by pointer in all
 // Crpt implementations.
 type BaseCrpt struct {
@@ -25,16 +83,11 @@ type BaseCrpt struct {
 	// hashFuncByte := byte(hashFunc)
 	hashFuncByte byte
 
-	// canSignPreHashedMessages specify whether a Crpt implementation can sign the
-	// pre-hashed messages. See Crpt.SignMessage for details.
-	canSignPreHashedMessages bool
-
 	// parentCrpt is the crpt.Crpt instance which is embedding this BaseCrpt instance.
 	parentCrpt Crpt
 }
 
-func NewBaseCrpt(t KeyType, hashFunc crypto.Hash, canSignPreHashedMessages bool, parentCrpt Crpt,
-) (*BaseCrpt, error) {
+func NewBaseCrpt(t KeyType, hashFunc crypto.Hash, parentCrpt Crpt) (*BaseCrpt, error) {
 	if hashFunc != 0 && !hashFunc.Available() {
 		panic("crypto: requested hash function #" + strconv.FormatInt(int64(hashFunc), 10) + " is unavailable")
 	}
@@ -42,11 +95,10 @@ func NewBaseCrpt(t KeyType, hashFunc crypto.Hash, canSignPreHashedMessages bool,
 		panic("implementations should always pass parentCrpt")
 	}
 	return &BaseCrpt{
-		keyType:                  t,
-		hashFunc:                 hashFunc,
-		hashFuncByte:             byte(hashFunc),
-		canSignPreHashedMessages: canSignPreHashedMessages,
-		parentCrpt:               parentCrpt,
+		keyType:      t,
+		hashFunc:     hashFunc,
+		hashFuncByte: byte(hashFunc),
+		parentCrpt:   parentCrpt,
 	}, nil
 }
 
@@ -96,18 +148,6 @@ func (c *BaseCrpt) HashToTyped(h Hash) TypedHash {
 	ht[0] = c.hashFuncByte
 	copy(ht[1:], h[1:])
 	return ht
-}
-
-// Sign implements Crpt.Sign, see Crpt.Sign for details.
-func (c *BaseCrpt) Sign(priv PrivateKey, message, digest []byte, hashFunc crypto.Hash, rand io.Reader,
-) (Signature, error) {
-	if len(digest) > 0 && c.canSignPreHashedMessages {
-		return c.parentCrpt.SignDigest(priv, digest, hashFunc, rand)
-	} else if len(message) > 0 {
-		return c.parentCrpt.SignMessage(priv, message, rand)
-	} else {
-		return nil, ErrEmptyMessage
-	}
 }
 
 // Sign implements Crpt.MerkleHashFromByteSlices using `crpt/go-merkle`.

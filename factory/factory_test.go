@@ -90,11 +90,11 @@ func TestNew(t *testing.T) {
 
 				// Test signing and verification
 				message := []byte("test message")
-				sig, err := got.SignMessage(priv, message, rand.Reader)
+				sig, err := priv.SignMessage(message, rand.Reader)
 				assert.NoError(t, err)
 				assert.NotNil(t, sig)
 
-				valid, err := got.VerifyMessage(pub, message, sig)
+				valid, err := pub.VerifyMessage(message, sig)
 				assert.NoError(t, err)
 				assert.True(t, valid)
 			}
@@ -217,23 +217,23 @@ func TestFactory_EdgeCases(t *testing.T) {
 
 		// Signatures should work with their respective keys
 		message := []byte("test message")
-		sig1, err := crypt1.SignMessage(priv1, message, rand.Reader)
+		sig1, err := priv1.SignMessage(message, rand.Reader)
 		require.NoError(t, err)
 
-		sig2, err := crypt2.SignMessage(priv2, message, rand.Reader)
+		sig2, err := priv2.SignMessage(message, rand.Reader)
 		require.NoError(t, err)
 
 		// Verify signatures
-		valid1, err := crypt1.VerifyMessage(pub1, message, sig1)
+		valid1, err := pub1.VerifyMessage(message, sig1)
 		require.NoError(t, err)
 		assert.True(t, valid1)
 
-		valid2, err := crypt2.VerifyMessage(pub2, message, sig2)
+		valid2, err := pub2.VerifyMessage(message, sig2)
 		require.NoError(t, err)
 		assert.True(t, valid2)
 
 		// Cross-verification should fail
-		crossValid1, err := crypt1.VerifyMessage(pub1, message, sig2)
+		crossValid1, err := pub1.VerifyMessage(message, sig2)
 		require.NoError(t, err)
 		assert.False(t, crossValid1)
 	})
@@ -257,10 +257,10 @@ func TestFactory_EdgeCases(t *testing.T) {
 			require.NoError(t, err)
 
 			message := []byte("test message")
-			sig, err := crypt.SignMessage(priv, message, rand.Reader)
+			sig, err := priv.SignMessage(message, rand.Reader)
 			require.NoError(t, err)
 
-			valid, err := crypt.VerifyMessage(pub, message, sig)
+			valid, err := pub.VerifyMessage(message, sig)
 			require.NoError(t, err)
 			assert.True(t, valid)
 		}
@@ -311,7 +311,7 @@ func BenchmarkFactory_InstanceUsage(b *testing.B) {
 	}
 
 	message := []byte("benchmark message")
-	sig, err := crypt.SignMessage(priv, message, rand.Reader)
+	sig, err := priv.SignMessage(message, rand.Reader)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -319,7 +319,7 @@ func BenchmarkFactory_InstanceUsage(b *testing.B) {
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		valid, err := crypt.VerifyMessage(pub, message, sig)
+		valid, err := pub.VerifyMessage(message, sig)
 		if err != nil {
 			b.Fatal(err)
 		}

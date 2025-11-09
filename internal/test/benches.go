@@ -16,14 +16,9 @@ func BenchmarkSignMessage(b *testing.B, c crpt.Crpt, privateKey []byte, kt crpt.
 		if c != nil {
 			priv, _ = c.PrivateKeyFromBytes(privateKey)
 		} else {
-			priv, _ = crpt.PrivateKeyFromTypedBytes(privateKey)
+			priv, _ = crpt.PrivateKeyFromTyped(privateKey)
 		}
-
-		if c != nil {
-			c.SignMessage(priv, TestMsg, nil)
-		} else {
-			crpt.SignMessage(priv, TestMsg, nil)
-		}
+		priv.SignMessage(TestMsg, nil)
 	}
 }
 
@@ -32,23 +27,13 @@ func BenchmarkVerify(b *testing.B, c crpt.Crpt, privateKey []byte, kt crpt.KeyTy
 	if c != nil {
 		priv, _ = c.PrivateKeyFromBytes(privateKey)
 	} else {
-		priv, _ = crpt.PrivateKeyFromTypedBytes(privateKey)
+		priv, _ = crpt.PrivateKeyFromTyped(privateKey)
 	}
-
-	var sig crpt.Signature
-	if c != nil {
-		sig, _ = c.Sign(priv, TestMsg, nil, crpt.NotHashed, nil)
-	} else {
-		sig, _ = crpt.Sign(priv, TestMsg, nil, crpt.NotHashed, nil)
-	}
+	sig, _ := priv.Sign(TestMsg, nil, crpt.NotHashed, nil)
 
 	b.ResetTimer()
 	for i := 0; i < b.N*10000; i++ {
 		pub := priv.Public()
-		if c != nil {
-			c.VerifyMessage(pub, TestMsg, sig)
-		} else {
-			crpt.VerifyMessage(pub, TestMsg, sig)
-		}
+		pub.VerifyMessage(TestMsg, sig)
 	}
 }
