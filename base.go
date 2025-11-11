@@ -6,37 +6,47 @@ package crpt
 
 import (
 	"crypto"
+	"errors"
 	"hash"
 	"io"
-	"strconv"
 
 	"github.com/crpt/go-merkle"
 )
 
-// BasePublicKey is a helper struct meant to be anonymously embedded by pointer in all
-// PublicKey implementations.
-type BasePublicKey struct {
+type BaseKey struct {
 	Type KeyType
-	Pub  PublicKey
+	Sops crypto.SignerOpts
 }
 
 // KeyType returns the key type.
-func (pub BasePublicKey) KeyType() KeyType {
-	return pub.Type
+func (k BaseKey) KeyType() KeyType {
+	return k.Type
+}
+
+// SignerOpts reports the default SignerOpts use by this key.
+func (k BaseKey) SignerOpts() crypto.SignerOpts {
+	return k.Sops
+}
+
+// BasePublicKey is a helper struct meant to be anonymously embedded by pointer in all
+// PublicKey implementations.
+type BasePublicKey struct {
+	*BaseKey
+	// Parent is the concrete PublicKey which is embedding this BasePublicKey instance.
+	Parent PublicKey
 }
 
 // ToTyped returns the typed bytes representation of the public key.
 func (pub BasePublicKey) ToTyped() Typed[PublicKey] {
-	return ToTyped(pub.Pub, pub.KeyType())
+	return ToTyped(pub.Parent, pub.KeyType())
 }
 
 // Verify reports whether `sig` is a valid signature of message or digest by the public key.
-func (pub BasePublicKey) Verify(message, digest []byte, hashFunc crypto.Hash, sig Signature,
-) (bool, error) {
-	if digest != nil && hashFunc.Available() {
-		return pub.Pub.VerifyDigest(digest, hashFunc, sig)
+func (pub BasePublicKey) Verify(message, digest []byte, sig Signature, opts crypto.SignerOpts) (bool, error) {
+	if digest != nil && opts != nil && opts.HashFunc().Available() {
+		return pub.Parent.VerifyDigest(digest, sig, opts)
 	} else if message != nil {
-		return pub.Pub.VerifyMessage(message, sig)
+		return pub.Parent.VerifyMessage(message, sig, opts)
 	} else {
 		return false, ErrEmptyMessage
 	}
@@ -45,27 +55,27 @@ func (pub BasePublicKey) Verify(message, digest []byte, hashFunc crypto.Hash, si
 // BasePrivateKey is a helper struct meant to be anonymously embedded by pointer in all
 // PrivateKey implementations.
 type BasePrivateKey struct {
-	Type KeyType
-	Priv PrivateKey
-}
-
-// KeyType returns the key type.
-func (priv BasePrivateKey) KeyType() KeyType {
-	return priv.Type
+	*BaseKey
+	// Parent is the concrete PublicKey which is embedding this BasePublicKey instance.
+	Parent PrivateKey
 }
 
 // ToTyped returns the typed bytes representation of the private key.
 func (priv BasePrivateKey) ToTyped() Typed[PrivateKey] {
-	return ToTyped(priv.Priv, priv.KeyType())
+	return ToTyped(priv.Parent, priv.KeyType())
 }
 
 // Sign produces a signature on the provided message.
-func (priv BasePrivateKey) Sign(message, digest []byte, hashFunc crypto.Hash, rand io.Reader,
+func (priv BasePrivateKey) Sign(message, digest []byte, rand io.Reader, opts crypto.SignerOpts,
 ) (Signature, error) {
-	if len(digest) > 0 && hashFunc.Available() {
-		return priv.Priv.SignDigest(digest, hashFunc, rand)
+	if len(digest) > 0 {
+		if !(opts != nil && opts.HashFunc().Available()) {
+			return nil, ErrInvalidHashFunc
+		} else {
+			return priv.Parent.SignDigest(digest, rand, opts)
+		}
 	} else if len(message) > 0 {
-		return priv.Priv.SignMessage(message, rand)
+		return priv.Parent.SignMessage(message, rand, opts)
 	} else {
 		return nil, ErrEmptyMessage
 	}
@@ -77,36 +87,47 @@ type BaseCrpt struct {
 	// KeyType used for embedding crpt.Crpt instance
 	keyType KeyType
 
-	// hashFunc holds the hash function to be used for Crpt.Hash.
-	hashFunc crypto.Hash
+	// sops holds the default signer options to be used for Crpt.Hash and other operations.
+	sops crypto.SignerOpts
 
-	// hashFuncByte := byte(hashFunc)
+	// hashFuncByte := byte(defaultSignerOpts.HashFunc())
 	hashFuncByte byte
 
-	// parentCrpt is the crpt.Crpt instance which is embedding this BaseCrpt instance.
-	parentCrpt Crpt
+	// parent is the concrete crpt.Crpt instance which is embedding this BaseCrpt instance.
+	parent Crpt
 }
 
-func NewBaseCrpt(t KeyType, hashFunc crypto.Hash, parentCrpt Crpt) (*BaseCrpt, error) {
-	if hashFunc != 0 && !hashFunc.Available() {
-		panic("crypto: requested hash function #" + strconv.FormatInt(int64(hashFunc), 10) + " is unavailable")
+var ErrParentIsNil = errors.New("implementations should always pass parent Crpt")
+
+// NewBaseCrpt returns a BaseCrpt.
+//
+// t: KeyType used for embedding crpt.Crpt instance
+// opts: holds the default signer options to be used for Crpt.Hash and other operations.
+// parent: the concrete crpt.Crpt instance which is embedding this BaseCrpt instance.
+func NewBaseCrpt(t KeyType, opts crypto.SignerOpts, parent Crpt) (*BaseCrpt, error) {
+	var hashFunc crypto.Hash
+	if opts != nil {
+		hashFunc = opts.HashFunc()
+		if hashFunc != 0 && !hashFunc.Available() {
+			return nil, ErrInvalidHashFunc
+		}
 	}
-	if parentCrpt == nil {
-		panic("implementations should always pass parentCrpt")
+	if parent == nil {
+		return nil, ErrParentIsNil
 	}
 	return &BaseCrpt{
 		keyType:      t,
-		hashFunc:     hashFunc,
+		sops:         opts,
 		hashFuncByte: byte(hashFunc),
-		parentCrpt:   parentCrpt,
+		parent:       parent,
 	}, nil
 }
 
 func (c *BaseCrpt) checkHashFunc() crypto.Hash {
-	if !c.hashFunc.Available() {
+	if c.sops == nil || !c.sops.HashFunc().Available() {
 		panic("crpt: hash function is not set")
 	}
-	return c.hashFunc
+	return c.sops.HashFunc()
 }
 
 // KeyType implements crpt.KeyType.
@@ -114,19 +135,27 @@ func (c *BaseCrpt) KeyType() KeyType {
 	return c.keyType
 }
 
-// HashFunc implements crpt.HashFunc.
-func (c *BaseCrpt) HashFunc() crypto.Hash {
-	return c.hashFunc
+// HashFunc implements crpt.SignerOpts.
+func (c *BaseCrpt) SignerOpts() crypto.SignerOpts {
+	return c.sops
 }
 
-// Hash implements Crpt.Hash using BaseCrpt.hashFunc.
+// HashFunc implements crpt.HashFunc.
+func (c *BaseCrpt) HashFunc() crypto.Hash {
+	if c.sops == nil {
+		return 0
+	}
+	return c.sops.HashFunc()
+}
+
+// Hash implements Crpt.Hash using BaseCrpt.defaultSignerOpts.
 func (c *BaseCrpt) Hash(b []byte) Hash {
-	h := c.checkHashFunc().New()
+	h := c.checkHashFunc().HashFunc().New()
 	h.Write(b)
 	return h.Sum(nil)
 }
 
-// Hash implements Crpt.Hash using BaseCrpt.hashFunc.
+// HashTyped implements Crpt.HashTyped using BaseCrpt.defaultSignerOpts.
 func (c *BaseCrpt) HashTyped(b []byte) TypedHash {
 	h := c.checkHashFunc().New()
 	h.Write(b)

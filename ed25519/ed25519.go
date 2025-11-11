@@ -23,6 +23,11 @@ import (
 	"github.com/crpt/go-crpt"
 )
 
+type SignerOpts = ved25519.Options
+
+// Type check
+var _ crypto.SignerOpts = (*SignerOpts)(nil)
+
 const (
 	KeyType = crpt.Ed25519
 	// 32 bytes
@@ -36,6 +41,9 @@ const (
 	// 64 bytes
 	AddressSize = PublicKeySize
 
+	DefaultContext         = ""
+	DefaultAddedRandomness = false
+
 	// cacheSize is the number of public keys that will be cached in
 	// an expanded format for repeated signature verification.
 	//
@@ -45,38 +53,22 @@ const (
 	cacheSize = 4096
 )
 
+var (
+	DefaultVerfiyOpts = ved25519.VerifyOptionsZIP_215
+	DefaultSignerOpts = &SignerOpts{
+		Hash:            crypto.SHA512,
+		Context:         DefaultContext,
+		AddedRandomness: DefaultAddedRandomness,
+		Verify:          DefaultVerfiyOpts,
+	}
+)
+
 func init() {
-	c, _ := New(0)
+	c, _ := New(nil)
 	crpt.RegisterCrpt(KeyType, c)
 }
 
-var (
-	optContext         = ""
-	optAddedRandomness = false
-	optVerfiy          = ved25519.VerifyOptionsZIP_215
-	notHashedOpts      = &ved25519.Options{
-		Hash:            crpt.NotHashed,
-		Context:         optContext,
-		AddedRandomness: optAddedRandomness,
-		Verify:          optVerfiy,
-	}
-	cachingVerifier = cache.NewVerifier(cache.NewLRUCache(cacheSize))
-)
-
-// SetEd25519Options sets the Ed25519 options used by this package.
-//
-// See `github.com/oasisprotocol/curve25519-voi/primitives/ed25519.Options` for parameter details.
-func SetEd25519Options(context string, addedRandomness bool, verify *ved25519.VerifyOptions) {
-	optContext = context
-	optAddedRandomness = addedRandomness
-	optVerfiy = verify
-	notHashedOpts = &ved25519.Options{
-		Hash:            crpt.NotHashed,
-		Context:         optContext,
-		AddedRandomness: optAddedRandomness,
-		Verify:          optVerfiy,
-	}
-}
+var cachingVerifier = cache.NewVerifier(cache.NewLRUCache(cacheSize))
 
 var (
 	KeyTypeByte = byte(KeyType)
@@ -88,6 +80,23 @@ var (
 	ErrNotEd25519PrivateKey = errors.New("not a Ed25519 private key")
 )
 
+// ConvertSignerOpts convert crypto.SignerOpts to SignerOpts, falling back to defaultOpts
+func ConvertSignerOpts(opts crypto.SignerOpts, defaultOpts SignerOpts) *SignerOpts {
+	if opts == nil {
+		return &defaultOpts
+	}
+
+	// If opts is provided and is *SignerOpts, use it; otherwise only use opts.HashFunc()
+	if o, ok := opts.(*SignerOpts); ok {
+		// Copy to avoid modifying the original
+		sops := *o
+		return &sops
+	} else {
+		defaultOpts.Hash = opts.HashFunc()
+		return &defaultOpts
+	}
+}
+
 // Ed25519 32-byte public key
 type PublicKey struct {
 	*crpt.BasePublicKey
@@ -98,7 +107,7 @@ type PublicKey struct {
 var _ crpt.PublicKey = (*PublicKey)(nil)
 
 // NewPublicKey from bytes
-func NewPublicKey(b []byte) (*PublicKey, error) {
+func NewPublicKey(b []byte, opts crypto.SignerOpts) (*PublicKey, error) {
 	if len(b) != PublicKeySize {
 		return nil, ErrWrongPublicKeySize
 	}
@@ -106,8 +115,11 @@ func NewPublicKey(b []byte) (*PublicKey, error) {
 		vpub: b,
 	}
 	pub.BasePublicKey = &crpt.BasePublicKey{
-		Type: KeyType,
-		Pub:  pub,
+		BaseKey: &crpt.BaseKey{
+			Type: KeyType,
+			Sops: opts,
+		},
+		Parent: pub,
 	}
 	return pub, nil
 }
@@ -123,7 +135,7 @@ type PrivateKey struct {
 var _ crpt.PrivateKey = (*PrivateKey)(nil)
 
 // NewPrivateKey from bytes
-func NewPrivateKey(b []byte) (*PrivateKey, error) {
+func NewPrivateKey(b []byte, opts crypto.SignerOpts) (*PrivateKey, error) {
 	if len(b) != PrivateKeySize {
 		return nil, ErrWrongPrivateKeySize
 	}
@@ -131,8 +143,11 @@ func NewPrivateKey(b []byte) (*PrivateKey, error) {
 		vpriv: b,
 	}
 	priv.BasePrivateKey = &crpt.BasePrivateKey{
-		Type: KeyType,
-		Priv: priv,
+		BaseKey: &crpt.BaseKey{
+			Type: KeyType,
+			Sops: opts,
+		},
+		Parent: priv,
 	}
 	return priv, nil
 }
@@ -164,10 +179,15 @@ func (pub PublicKey) Address() Address {
 	return Address(pub.vpub)
 }
 
-func (pub PublicKey) VerifyMessage(message []byte, sig crpt.Signature) (ok bool, err error) {
+func (pub PublicKey) VerifyMessage(message []byte, sig crpt.Signature, opts crypto.SignerOpts,
+) (ok bool, err error) {
 	if len(sig) != SignatureSize {
 		return false, nil
 	}
+
+	sops := ConvertSignerOpts(opts, *pub.SignerOpts().(*SignerOpts))
+	// Alwasy use crpt.NotHashed for SignMessage
+	sops.Hash = crpt.NotHashed
 
 	defer func() {
 		if r := recover(); r != nil {
@@ -175,17 +195,16 @@ func (pub PublicKey) VerifyMessage(message []byte, sig crpt.Signature) (ok bool,
 			err = gerr.ToError(r)
 		}
 	}()
-	return cachingVerifier.VerifyWithOptions(pub.vpub, message, sig, notHashedOpts), nil
+	return cachingVerifier.VerifyWithOptions(pub.vpub, message, sig, sops), nil
 }
 
-func (pub PublicKey) VerifyDigest(digest []byte, hashFunc crypto.Hash, sig crpt.Signature,
+func (pub PublicKey) VerifyDigest(digest []byte, sig crpt.Signature, opts crypto.SignerOpts,
 ) (ok bool, err error) {
-	if !hashFunc.Available() {
-		return false, crpt.ErrInvalidHashFunc
-	}
 	if len(sig) != SignatureSize {
 		return false, nil
 	}
+
+	sops := ConvertSignerOpts(opts, *pub.SignerOpts().(*SignerOpts))
 
 	defer func() {
 		if r := recover(); r != nil {
@@ -193,12 +212,7 @@ func (pub PublicKey) VerifyDigest(digest []byte, hashFunc crypto.Hash, sig crpt.
 			err = gerr.ToError(r)
 		}
 	}()
-	return cachingVerifier.VerifyWithOptions(pub.vpub, digest, sig, &ved25519.Options{
-		Hash:            hashFunc,
-		Context:         optContext,
-		AddedRandomness: optAddedRandomness,
-		Verify:          optVerfiy,
-	}), nil
+	return cachingVerifier.VerifyWithOptions(pub.vpub, digest, sig, sops), nil
 }
 
 func (priv PrivateKey) Equal(o crpt.PrivateKey) bool {
@@ -230,7 +244,7 @@ func (priv PrivateKey) Public() crpt.PublicKey {
 		panic("Expected ed25519 PrivateKey to include concatenated PublicKey bytes")
 	}
 
-	pub, err := NewPublicKey(priv.vpriv.Public().(ved25519.PublicKey))
+	pub, err := NewPublicKey(priv.vpriv.Public().(ved25519.PublicKey), priv.SignerOpts())
 	// Should never happens
 	if err != nil {
 		panic(err)
@@ -238,33 +252,42 @@ func (priv PrivateKey) Public() crpt.PublicKey {
 	return pub
 }
 
-func (priv PrivateKey) SignMessage(message []byte, rand io.Reader) (crpt.Signature, error) {
-	return priv.vpriv.Sign(rand, message, notHashedOpts)
+func (priv PrivateKey) SignMessage(message []byte, rand io.Reader, opts crypto.SignerOpts) (crpt.Signature, error) {
+	// If opts is provided and is *SignerOpts, use it; otherwise use the default
+	sops := ConvertSignerOpts(opts, *priv.SignerOpts().(*SignerOpts))
+	// Alwasy use crpt.NotHashed for SignMessage
+	sops.Hash = crpt.NotHashed
+	return priv.vpriv.Sign(rand, message, sops)
 }
 
-func (priv PrivateKey) SignDigest(digest []byte, hashFunc crypto.Hash, rand io.Reader,
+func (priv PrivateKey) SignDigest(digest []byte, rand io.Reader, opts crypto.SignerOpts,
 ) (crpt.Signature, error) {
-	if !hashFunc.Available() {
+	sops := ConvertSignerOpts(opts, *priv.SignerOpts().(*SignerOpts))
+	if !sops.Hash.Available() {
 		return nil, crpt.ErrInvalidHashFunc
 	}
-
-	return priv.vpriv.Sign(rand, digest, &ved25519.Options{
-		Hash:            hashFunc,
-		Context:         optContext,
-		AddedRandomness: optAddedRandomness,
-		Verify:          optVerfiy,
-	})
+	return priv.vpriv.Sign(rand, digest, sops)
 }
 
 // New creates an Ed225519 Crpt.
-func New(hash crypto.Hash) (*ed25519Crpt, error) {
+func New(opts *SignerOpts) (*ed25519Crpt, error) {
+	sops := opts
+	if opts == nil {
+		sops = DefaultSignerOpts
+	}
 	crypt := &ed25519Crpt{}
-	base, err := crpt.NewBaseCrpt(KeyType, hash, crypt)
+	base, err := crpt.NewBaseCrpt(KeyType, sops, crypt)
 	if err != nil {
 		return nil, err
 	}
 	crypt.BaseCrpt = base
 	return crypt, nil
+}
+
+// New creates an Ed225519 Crpt with crypto.SignerOpts.
+func NewWithCryptoSignerOpts(opts crypto.SignerOpts) (*ed25519Crpt, error) {
+	sops := ConvertSignerOpts(opts, *DefaultSignerOpts)
+	return New(sops)
 }
 
 type ed25519Crpt struct {
@@ -274,11 +297,11 @@ type ed25519Crpt struct {
 var _ crpt.Crpt = (*ed25519Crpt)(nil)
 
 func (c *ed25519Crpt) PublicKeyFromBytes(pub []byte) (crpt.PublicKey, error) {
-	return NewPublicKey(pub)
+	return NewPublicKey(pub, c.SignerOpts())
 }
 
 func (c *ed25519Crpt) PrivateKeyFromBytes(priv []byte) (crpt.PrivateKey, error) {
-	return NewPrivateKey(priv)
+	return NewPrivateKey(priv, c.SignerOpts())
 }
 
 // SignatureToASN1 converts an Ed25519 signature to ASN.1 DER encoding.
@@ -316,18 +339,41 @@ func (c *ed25519Crpt) GenerateKey(rand io.Reader,
 	return cpub, cpriv, err
 }
 
+// NewBatchVerifier creates a new batch verifier for Ed25519 with the given options.
+func (c *ed25519Crpt) NewBatchVerifier(opts crypto.SignerOpts) (crpt.BatchVerifier, error) {
+	sops := ConvertSignerOpts(opts, *c.SignerOpts().(*SignerOpts))
+	return NewBatchVerifier(sops), nil
+}
+
 /* Batch */
 
 // BatchVerifier implements batch verification for ed25519.
 type BatchVerifier struct {
 	*ved25519.BatchVerifier
+
+	// Default signer options
+	sops *SignerOpts
 }
 
-func NewBatchVerifier() crpt.BatchVerifier {
-	return &BatchVerifier{ved25519.NewBatchVerifier()}
+// NewBatchVerifier create a crpt.BatchVerifier
+func NewBatchVerifier(opts *SignerOpts) crpt.BatchVerifier {
+	sops := opts
+	if opts == nil {
+		sops = DefaultSignerOpts
+	}
+	return &BatchVerifier{
+		BatchVerifier: ved25519.NewBatchVerifier(),
+		sops:          sops,
+	}
 }
 
-func (b *BatchVerifier) Add(pub crpt.PublicKey, message []byte, sig crpt.Signature) error {
+// NewBatchVerifierWithCryptoSignerOpts create a crpt.BatchVerifier from cryptoo.SignerOpts
+func NewBatchVerifierWithCryptoSignerOpts(opts crypto.SignerOpts) crpt.BatchVerifier {
+	sops := ConvertSignerOpts(opts, *DefaultSignerOpts)
+	return NewBatchVerifier(sops)
+}
+
+func (b *BatchVerifier) Add(pub crpt.PublicKey, message, digest []byte, sig crpt.Signature, opts crypto.SignerOpts) error {
 	edpub, ok := pub.(*PublicKey)
 	if !ok {
 		return ErrNotEd25519PublicKey
@@ -342,8 +388,18 @@ func (b *BatchVerifier) Add(pub crpt.PublicKey, message []byte, sig crpt.Signatu
 		return crpt.ErrWrongSignatureSize
 	}
 
-	cachingVerifier.AddWithOptions(b.BatchVerifier, edpub.vpub, message, sig, notHashedOpts)
+	// Fall back to b.sops
+	sops := ConvertSignerOpts(opts, *b.sops)
+	m := message
+	if digest != nil && opts != nil && opts.HashFunc().Available() {
+		m = digest
+	} else if message != nil {
+		sops.Hash = crpt.NotHashed
+	} else {
+		return crpt.ErrEmptyMessage
+	}
 
+	cachingVerifier.AddWithOptions(b.BatchVerifier, edpub.vpub, m, sig, sops)
 	return nil
 }
 

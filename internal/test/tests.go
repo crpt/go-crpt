@@ -121,50 +121,50 @@ func Test_XxxFromBytes_SignXxx_Verify(t *testing.T, c crpt.Crpt, privateKey []by
 
 	var sig, sig2, sig_ crpt.Signature
 	if c != nil {
-		sig, err = priv.Sign(TestMsg, nil, crpt.NotHashed, nil)
+		sig, err = priv.Sign(TestMsg, nil, nil, nil)
 		req.NoError(err)
-		sig2, err = priv.Sign(TestMsg2, nil, crpt.NotHashed, nil)
+		sig2, err = priv.Sign(TestMsg2, nil, nil, nil)
 		req.NoError(err)
 	} else {
-		sig, err = priv.Sign(TestMsg, nil, crpt.NotHashed, nil)
+		sig, err = priv.Sign(TestMsg, nil, nil, nil)
 		req.NoError(err)
-		sig2, err = priv.Sign(TestMsg2, nil, crpt.NotHashed, nil)
+		sig2, err = priv.Sign(TestMsg2, nil, nil, nil)
 		req.NoError(err)
 	}
 
-	sig_, err = priv.SignMessage(TestMsg, nil)
+	sig_, err = priv.SignMessage(TestMsg, nil, nil)
 	req.NoError(err)
 	assr.Equal(sig, sig_)
 
-	sig_, err = priv.SignDigest(TestDigest, TestHashFunc, nil)
+	sig_, err = priv.SignDigest(TestDigest, nil, TestHashFunc)
 	req.NoError(err)
 
-	_, err = priv.SignDigest(TestMsg, crpt.NotHashed, nil)
+	_, err = priv.SignDigest(TestMsg, nil, crpt.NotHashed)
 	assr.ErrorIs(err, crpt.ErrInvalidHashFunc)
 
 	pub := priv.Public()
 	var ok bool
-	ok, err = pub.Verify(TestMsg, nil, crpt.NotHashed, sig)
+	ok, err = pub.Verify(TestMsg, nil, sig, nil)
 	assr.NoError(err)
 	assr.True(ok)
 
-	ok, err = pub.Verify(TestMsg, nil, crpt.NotHashed, sig2)
+	ok, err = pub.Verify(TestMsg, nil, sig2, nil)
 	assr.NoError(err)
 	assr.False(ok)
 
-	ok, err = pub.VerifyMessage(TestMsg, sig)
+	ok, err = pub.VerifyMessage(TestMsg, sig, nil)
 	assr.NoError(err)
 	assr.True(ok)
 
-	ok, err = pub.VerifyMessage(TestMsg, sig2)
+	ok, err = pub.VerifyMessage(TestMsg, sig2, nil)
 	assr.NoError(err)
 	assr.False(ok)
 
-	ok, err = pub.VerifyDigest(TestDigest, TestHashFunc, sig_)
+	ok, err = pub.VerifyDigest(TestDigest, sig_, TestHashFunc)
 	assr.NoError(err)
 	assr.True(ok)
 
-	ok, err = pub.VerifyDigest(TestDigest, TestHashFunc, sig2)
+	ok, err = pub.VerifyDigest(TestDigest, sig2, TestHashFunc)
 	assr.NoError(err)
 	assr.False(ok)
 }
@@ -172,7 +172,7 @@ func Test_XxxFromBytes_SignXxx_Verify(t *testing.T, c crpt.Crpt, privateKey []by
 func Test_Batch(t *testing.T, c crpt.Crpt, kt crpt.KeyType) {
 	req := require.New(t)
 
-	v, ok := batch.NewBatchVerifier(kt)
+	v, ok := batch.NewBatchVerifier(kt, crypto.SHA512)
 	if !ok {
 		return
 	}
@@ -197,15 +197,55 @@ func Test_Batch(t *testing.T, c crpt.Crpt, kt crpt.KeyType) {
 			msg = []byte("egg")
 		}
 
-		sig, err := priv.SignMessage(msg, nil)
+		sig, err := priv.SignMessage(msg, nil, nil)
 		req.NoError(err)
 
-		err = v.Add(pub, msg, sig)
+		err = v.Add(pub, msg, nil, sig, nil)
 		req.NoError(err)
 	}
 
 	ok, _ = v.Verify(nil)
 	req.True(ok)
+}
+
+func Test_NewBatchVerifier(t *testing.T, c crpt.Crpt, kt crpt.KeyType) {
+	req := require.New(t)
+	assr := assert.New(t)
+
+	// Test with nil options
+	bv, err := c.NewBatchVerifier(nil)
+	if err == crpt.ErrUnimplemented {
+		// If the key type doesn't support batch verification, that's valid
+		assr.Nil(bv, "Batch verifier should be nil when not supported")
+		return
+	}
+
+	// If supported, verifier should not be nil
+	assr.NotNil(bv, "Batch verifier should not be nil when supported")
+
+	// Test with SHA512 options
+	opts := crypto.SHA512
+	bvWithOpts, err := c.NewBatchVerifier(opts)
+	assr.NoError(err, "Should support batch verification with options")
+	assr.NotNil(bvWithOpts, "Batch verifier with options should not be nil")
+
+	// Test that the batch verifier actually works
+	pub, priv, err := c.GenerateKey(nil)
+	req.NoError(err)
+
+	message := []byte("test message for batch verifier")
+	sig, err := priv.SignMessage(message, nil, nil)
+	req.NoError(err)
+
+	// Add signature to batch verifier
+	err = bv.Add(pub, message, nil, sig, nil)
+	req.NoError(err)
+
+	// Verify batch
+	ok, results := bv.Verify(nil)
+	req.True(ok, "Batch verification should succeed")
+	req.Len(results, 1, "Should return one result")
+	req.True(results[0], "Signature should be valid")
 }
 
 func Test_SignatureToASN1(t *testing.T, c crpt.Crpt, kt crpt.KeyType) {
@@ -226,9 +266,9 @@ func Test_SignatureToASN1(t *testing.T, c crpt.Crpt, kt crpt.KeyType) {
 	// Test with a valid signature
 	var sig crpt.Signature
 	if c != nil {
-		sig, err = priv.SignMessage(TestMsg, nil)
+		sig, err = priv.SignMessage(TestMsg, nil, nil)
 	} else {
-		sig, err = priv.SignMessage(TestMsg, nil)
+		sig, err = priv.SignMessage(TestMsg, nil, nil)
 	}
 	req.NoError(err)
 
@@ -253,7 +293,7 @@ func Test_SignatureToASN1(t *testing.T, c crpt.Crpt, kt crpt.KeyType) {
 	if kt == crpt.Ed25519 {
 		expectedLength := 66 // 1 (tag) + 1 (length) + 64 (signature)
 		assr.Equal(expectedLength, len(asn1Bytes))
-		assr.Equal(byte(64), asn1Bytes[1]) // Length field
+		assr.Equal(byte(64), asn1Bytes[1])     // Length field
 		assr.Equal([]byte(sig), asn1Bytes[2:]) // The signature itself
 	}
 
@@ -268,9 +308,9 @@ func Test_SignatureToASN1(t *testing.T, c crpt.Crpt, kt crpt.KeyType) {
 	for i, msg := range testMessages {
 		var testSig crpt.Signature
 		if c != nil {
-			testSig, err = priv.SignMessage(msg, nil)
+			testSig, err = priv.SignMessage(msg, nil, nil)
 		} else {
-			testSig, err = priv.SignMessage(msg, nil)
+			testSig, err = priv.SignMessage(msg, nil, nil)
 		}
 		req.NoError(err)
 
@@ -309,7 +349,7 @@ func Test_SignatureToASN1(t *testing.T, c crpt.Crpt, kt crpt.KeyType) {
 
 	// Test that ASN.1 conversion doesn't affect signature verification
 	// The original signature should still be valid
-	ok, err := pub.VerifyMessage(TestMsg, sig)
+	ok, err := pub.VerifyMessage(TestMsg, sig, nil)
 	req.NoError(err)
 	req.True(ok)
 }

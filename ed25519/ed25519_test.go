@@ -22,7 +22,7 @@ func TestEd25519Crpt(t *testing.T) {
 	req := require.New(t)
 	assr := assert.New(t)
 
-	c, err := New(crypto.SHA256)
+	c, err := New(nil)
 	req.NoError(err)
 
 	t.Run("PublicKey/PrivateKey", func(t *testing.T) {
@@ -31,7 +31,7 @@ func TestEd25519Crpt(t *testing.T) {
 
 	t.Run("KeyType & HashFunc", func(t *testing.T) {
 		assr.Equal(crpt.Ed25519, c.KeyType())
-		assr.Equal(crypto.SHA256, c.HashFunc())
+		assr.Equal(crypto.SHA512, c.HashFunc())
 	})
 
 	t.Run("Hash", func(t *testing.T) {
@@ -49,13 +49,17 @@ func TestEd25519Crpt(t *testing.T) {
 	t.Run("SignatureToASN1", func(t *testing.T) {
 		test.Test_SignatureToASN1(t, c, crpt.Ed25519)
 	})
+
+	t.Run("NewBatchVerifier", func(t *testing.T) {
+		test.Test_NewBatchVerifier(t, c, crpt.Ed25519)
+	})
 }
 
 func TestEd25519_Comprehensive(t *testing.T) {
 	// Use SHA512 which works with the ed25519 implementation
 	hashFunc := crypto.SHA512
 
-	c, err := New(hashFunc)
+	c, err := NewWithCryptoSignerOpts(hashFunc)
 	require.NoError(t, err)
 
 	// Test key generation
@@ -98,12 +102,12 @@ func TestEd25519_Comprehensive(t *testing.T) {
 		rand.Read(message)
 
 		// Sign message
-		sig, err := priv.SignMessage(message, rand.Reader)
+		sig, err := priv.SignMessage(message, rand.Reader, nil)
 		require.NoError(t, err)
 		require.Len(t, sig, 64)
 
 		// Verify signature
-		valid, err := pub.VerifyMessage(message, sig)
+		valid, err := pub.VerifyMessage(message, sig, nil)
 		require.NoError(t, err)
 		require.True(t, valid)
 
@@ -112,7 +116,7 @@ func TestEd25519_Comprehensive(t *testing.T) {
 		copy(wrongMessage, message)
 		if len(wrongMessage) > 0 {
 			wrongMessage[0] ^= 0xFF
-			valid, err = pub.VerifyMessage(wrongMessage, sig)
+			valid, err = pub.VerifyMessage(wrongMessage, sig, nil)
 			require.NoError(t, err)
 			require.False(t, valid)
 		}
@@ -123,11 +127,11 @@ func TestEd25519_Comprehensive(t *testing.T) {
 	digest := c.Hash(message)
 
 	// Sign digest
-	sig, err := priv.SignDigest(digest, hashFunc, rand.Reader)
+	sig, err := priv.SignDigest(digest, rand.Reader, hashFunc)
 	require.NoError(t, err)
 
 	// Verify digest
-	valid, err := pub.VerifyDigest(digest, hashFunc, sig)
+	valid, err := pub.VerifyDigest(digest, sig, hashFunc)
 	require.NoError(t, err)
 	require.True(t, valid)
 
@@ -136,13 +140,13 @@ func TestEd25519_Comprehensive(t *testing.T) {
 	copy(wrongDigest, digest)
 	wrongDigest[0] ^= 0xFF
 
-	valid, err = pub.VerifyDigest(wrongDigest, hashFunc, sig)
+	valid, err = pub.VerifyDigest(wrongDigest, sig, hashFunc)
 	require.NoError(t, err)
 	require.False(t, valid)
 }
 
 func TestEd25519_ErrorCases(t *testing.T) {
-	c, err := New(crypto.SHA256)
+	c, err := New(nil)
 	require.NoError(t, err)
 
 	t.Run("Invalid signature sizes", func(t *testing.T) {
@@ -157,7 +161,7 @@ func TestEd25519_ErrorCases(t *testing.T) {
 			sig := make([]byte, size)
 			rand.Read(sig)
 
-			valid, err := pub.VerifyMessage(message, sig)
+			valid, err := pub.VerifyMessage(message, sig, nil)
 			require.NoError(t, err)
 			require.False(t, valid)
 		}
@@ -223,7 +227,7 @@ func TestEd25519_ErrorCases(t *testing.T) {
 }
 
 func TestEd25519_KeySerializationRoundTrip(t *testing.T) {
-	c, err := New(crypto.SHA256)
+	c, err := New(nil)
 	require.NoError(t, err)
 
 	// Generate multiple key pairs
@@ -245,17 +249,17 @@ func TestEd25519_KeySerializationRoundTrip(t *testing.T) {
 
 		// Test that round-tripped keys can sign and verify
 		message := []byte("round-trip test")
-		sig, err := privFromBytes.SignMessage(message, rand.Reader)
+		sig, err := privFromBytes.SignMessage(message, rand.Reader, nil)
 		require.NoError(t, err)
 
-		valid, err := pubFromBytes.VerifyMessage(message, sig)
+		valid, err := pubFromBytes.VerifyMessage(message, sig, nil)
 		require.NoError(t, err)
 		require.True(t, valid)
 	}
 }
 
 func TestEd25519_ConcurrentOperations(t *testing.T) {
-	c, err := New(crypto.SHA256)
+	c, err := New(nil)
 	require.NoError(t, err)
 
 	const numGoroutines = 20
@@ -278,10 +282,10 @@ func TestEd25519_ConcurrentOperations(t *testing.T) {
 			defer func() { done <- true }()
 			for j := 0; j < operationsPerGoroutine; j++ {
 				message := []byte("concurrent test message")
-				sig, err := privs[index].SignMessage(message, rand.Reader)
+				sig, err := privs[index].SignMessage(message, rand.Reader, nil)
 				require.NoError(t, err)
 
-				valid, err := pubs[index].VerifyMessage(message, sig)
+				valid, err := pubs[index].VerifyMessage(message, sig, nil)
 				require.NoError(t, err)
 				require.True(t, valid)
 			}
@@ -298,7 +302,7 @@ func TestEd25519_HashFunctionConsistency(t *testing.T) {
 	// Test with SHA512 which is supported by the ed25519 implementation
 	hashFunc := crypto.SHA512
 
-	c, err := New(hashFunc)
+	c, err := NewWithCryptoSignerOpts(hashFunc)
 	require.NoError(t, err)
 
 	// Test that hash function is correctly set
@@ -321,7 +325,7 @@ func TestEd25519_HashFunctionConsistency(t *testing.T) {
 }
 
 func TestEd25519_SignatureProperties(t *testing.T) {
-	c, err := New(crypto.SHA512)
+	c, err := New(nil)
 	require.NoError(t, err)
 
 	pub, priv, err := c.GenerateKey(rand.Reader)
@@ -330,18 +334,18 @@ func TestEd25519_SignatureProperties(t *testing.T) {
 	message := []byte("signature properties test")
 
 	// Sign the same message multiple times
-	sig1, err := priv.SignMessage(message, rand.Reader)
+	sig1, err := priv.SignMessage(message, rand.Reader, nil)
 	require.NoError(t, err)
 
-	sig2, err := priv.SignMessage(message, rand.Reader)
+	sig2, err := priv.SignMessage(message, rand.Reader, nil)
 	require.NoError(t, err)
 
 	// Both should verify correctly
-	valid1, err := pub.VerifyMessage(message, sig1)
+	valid1, err := pub.VerifyMessage(message, sig1, nil)
 	require.NoError(t, err)
 	require.True(t, valid1)
 
-	valid2, err := pub.VerifyMessage(message, sig2)
+	valid2, err := pub.VerifyMessage(message, sig2, nil)
 	require.NoError(t, err)
 	require.True(t, valid2)
 
@@ -358,7 +362,7 @@ func TestEd25519_SignatureProperties(t *testing.T) {
 }
 
 func TestEd25519_LargeMessageSigning(t *testing.T) {
-	c, err := New(crypto.SHA512)
+	c, err := New(nil)
 	require.NoError(t, err)
 
 	pub, priv, err := c.GenerateKey(rand.Reader)
@@ -371,10 +375,10 @@ func TestEd25519_LargeMessageSigning(t *testing.T) {
 			message := make([]byte, size)
 			rand.Read(message)
 
-			sig, err := priv.SignMessage(message, rand.Reader)
+			sig, err := priv.SignMessage(message, rand.Reader, nil)
 			require.NoError(t, err)
 
-			valid, err := pub.VerifyMessage(message, sig)
+			valid, err := pub.VerifyMessage(message, sig, nil)
 			require.NoError(t, err)
 			require.True(t, valid)
 		})
@@ -382,7 +386,7 @@ func TestEd25519_LargeMessageSigning(t *testing.T) {
 }
 
 func TestEd25519_SignatureToASN1(t *testing.T) {
-	c, err := New(crypto.SHA512)
+	c, err := New(nil)
 	require.NoError(t, err)
 
 	_, priv, err := c.GenerateKey(rand.Reader)
@@ -391,7 +395,7 @@ func TestEd25519_SignatureToASN1(t *testing.T) {
 	message := []byte("test message for ASN.1 encoding")
 
 	// Create a signature
-	sig, err := priv.SignMessage(message, rand.Reader)
+	sig, err := priv.SignMessage(message, rand.Reader, nil)
 	require.NoError(t, err)
 	require.Len(t, sig, 64)
 
@@ -410,7 +414,7 @@ func TestEd25519_SignatureToASN1(t *testing.T) {
 		// For Ed25519: OCTET STRING (0x04) + length (1 byte) + 64 bytes signature
 		expectedLength := 66 // 1 (tag) + 1 (length) + 64 (signature)
 		assert.Equal(t, expectedLength, len(asn1Bytes))
-		assert.Equal(t, byte(64), asn1Bytes[1]) // Length field
+		assert.Equal(t, byte(64), asn1Bytes[1])     // Length field
 		assert.Equal(t, []byte(sig), asn1Bytes[2:]) // The signature itself
 	})
 
@@ -443,7 +447,7 @@ func TestEd25519_SignatureToASN1(t *testing.T) {
 		// Test converting multiple different signatures
 		for i := 0; i < 10; i++ {
 			message := []byte(fmt.Sprintf("test message %d", i))
-			sig, err := priv.SignMessage(message, rand.Reader)
+			sig, err := priv.SignMessage(message, rand.Reader, nil)
 			require.NoError(t, err)
 
 			asn1Bytes, err := c.SignatureToASN1(sig)
@@ -491,7 +495,7 @@ func TestEd25519_SignatureToASN1(t *testing.T) {
 }
 
 func TestEd25519_MemoryUsage(t *testing.T) {
-	c, err := New(crypto.SHA512)
+	c, err := New(nil)
 	require.NoError(t, err)
 
 	// Test that repeated operations don't leak memory
@@ -502,10 +506,10 @@ func TestEd25519_MemoryUsage(t *testing.T) {
 		message := make([]byte, 1024)
 		rand.Read(message)
 
-		sig, err := priv.SignMessage(message, rand.Reader)
+		sig, err := priv.SignMessage(message, rand.Reader, nil)
 		require.NoError(t, err)
 
-		valid, err := pub.VerifyMessage(message, sig)
+		valid, err := pub.VerifyMessage(message, sig, nil)
 		require.NoError(t, err)
 		require.True(t, valid)
 
@@ -521,7 +525,7 @@ func TestEd25519_MemoryUsage(t *testing.T) {
 
 // Comprehensive benchmarks for ed25519 package
 func BenchmarkEd25519_KeyGeneration(b *testing.B) {
-	c, err := New(crypto.SHA256)
+	c, err := New(nil)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -536,7 +540,7 @@ func BenchmarkEd25519_KeyGeneration(b *testing.B) {
 }
 
 func BenchmarkEd25519_SignMessage_Sizes(b *testing.B) {
-	c, err := New(crypto.SHA256)
+	c, err := New(nil)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -555,7 +559,7 @@ func BenchmarkEd25519_SignMessage_Sizes(b *testing.B) {
 
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				_, err := priv.SignMessage(message, rand.Reader)
+				_, err := priv.SignMessage(message, rand.Reader, nil)
 				if err != nil {
 					b.Fatal(err)
 				}
@@ -565,7 +569,7 @@ func BenchmarkEd25519_SignMessage_Sizes(b *testing.B) {
 }
 
 func BenchmarkEd25519_VerifyMessage_Sizes(b *testing.B) {
-	c, err := New(crypto.SHA256)
+	c, err := New(nil)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -582,14 +586,14 @@ func BenchmarkEd25519_VerifyMessage_Sizes(b *testing.B) {
 			// Use the original message that was signed
 			message := make([]byte, size)
 			rand.Read(message)
-			sig, err := priv.SignMessage(message, rand.Reader)
+			sig, err := priv.SignMessage(message, rand.Reader, nil)
 			if err != nil {
 				b.Fatal(err)
 			}
 
 			b.ResetTimer()
 			for j := 0; j < b.N; j++ {
-				valid, err := pub.VerifyMessage(message, sig)
+				valid, err := pub.VerifyMessage(message, sig, nil)
 				if err != nil {
 					b.Fatal(err)
 				}
@@ -602,7 +606,7 @@ func BenchmarkEd25519_VerifyMessage_Sizes(b *testing.B) {
 }
 
 func BenchmarkEd25519_KeySerialization(b *testing.B) {
-	c, err := New(crypto.SHA256)
+	c, err := New(nil)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -638,7 +642,7 @@ func BenchmarkEd25519_KeySerialization(b *testing.B) {
 }
 
 func BenchmarkEd25519_KeyDeserialization(b *testing.B) {
-	c, err := New(crypto.SHA256)
+	c, err := New(nil)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -678,7 +682,7 @@ func BenchmarkEd25519_KeyDeserialization(b *testing.B) {
 }
 
 func BenchmarkEd25519_HashOperations(b *testing.B) {
-	c, err := New(crypto.SHA256)
+	c, err := New(nil)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -700,7 +704,7 @@ func BenchmarkEd25519_HashOperations(b *testing.B) {
 }
 
 func BenchmarkEd25519_ConcurrentOperations(b *testing.B) {
-	c, err := New(crypto.SHA256)
+	c, err := New(nil)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -721,7 +725,7 @@ func BenchmarkEd25519_ConcurrentOperations(b *testing.B) {
 		privs[i] = priv
 		messages[i] = make([]byte, 256)
 		rand.Read(messages[i])
-		signatures[i], err = priv.SignMessage(messages[i], rand.Reader)
+		signatures[i], err = priv.SignMessage(messages[i], rand.Reader, nil)
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -732,7 +736,7 @@ func BenchmarkEd25519_ConcurrentOperations(b *testing.B) {
 		i := 0
 		for pb.Next() {
 			idx := i % numKeys
-			valid, err := pubs[idx].VerifyMessage(messages[idx], signatures[idx])
+			valid, err := pubs[idx].VerifyMessage(messages[idx], signatures[idx], nil)
 			if err != nil {
 				b.Fatal(err)
 			}
@@ -745,7 +749,7 @@ func BenchmarkEd25519_ConcurrentOperations(b *testing.B) {
 }
 
 func BenchmarkEd25519_SignatureToASN1(b *testing.B) {
-	c, err := New(crypto.SHA256)
+	c, err := New(nil)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -757,7 +761,7 @@ func BenchmarkEd25519_SignatureToASN1(b *testing.B) {
 
 	// Generate a test signature
 	message := []byte("benchmark message")
-	sig, err := priv.SignMessage(message, rand.Reader)
+	sig, err := priv.SignMessage(message, rand.Reader, nil)
 	if err != nil {
 		b.Fatal(err)
 	}

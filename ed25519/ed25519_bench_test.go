@@ -5,14 +5,13 @@
 package ed25519
 
 import (
-	"crypto"
 	"crypto/rand"
 	"testing"
 )
 
 // BenchmarkGenerateKey benchmarks key generation
 func BenchmarkGenerateKey(b *testing.B) {
-	crypt, err := New(crypto.SHA256)
+	crypt, err := New(nil)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -28,7 +27,7 @@ func BenchmarkGenerateKey(b *testing.B) {
 
 // BenchmarkSignMessage benchmarks message signing
 func BenchmarkSignMessage(b *testing.B) {
-	crypt, err := New(crypto.SHA256)
+	crypt, err := New(nil)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -41,7 +40,7 @@ func BenchmarkSignMessage(b *testing.B) {
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		_, err := priv.SignMessage(message, rand.Reader)
+		_, err := priv.SignMessage(message, rand.Reader, nil)
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -50,7 +49,7 @@ func BenchmarkSignMessage(b *testing.B) {
 
 // BenchmarkVerifyMessage benchmarks message verification
 func BenchmarkVerifyMessage(b *testing.B) {
-	crypt, err := New(crypto.SHA256)
+	crypt, err := New(nil)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -60,7 +59,7 @@ func BenchmarkVerifyMessage(b *testing.B) {
 	}
 
 	message := []byte("benchmark message for verification")
-	sig, err := priv.SignMessage(message, rand.Reader)
+	sig, err := priv.SignMessage(message, rand.Reader, nil)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -68,7 +67,7 @@ func BenchmarkVerifyMessage(b *testing.B) {
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		valid, err := pub.VerifyMessage(message, sig)
+		valid, err := pub.VerifyMessage(message, sig, nil)
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -80,7 +79,7 @@ func BenchmarkVerifyMessage(b *testing.B) {
 
 // BenchmarkHash benchmarks hash computation
 func BenchmarkHash(b *testing.B) {
-	crypt, err := New(crypto.SHA256)
+	crypt, err := New(nil)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -94,7 +93,7 @@ func BenchmarkHash(b *testing.B) {
 
 // BenchmarkBatchVerifier benchmarks batch verification
 func BenchmarkBatchVerifier(b *testing.B) {
-	crypt, err := New(crypto.SHA256)
+	crypt, err := New(nil)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -115,7 +114,7 @@ func BenchmarkBatchVerifier(b *testing.B) {
 		pubs[i] = cpub.(PublicKey)
 		privs[i] = cpriv.(PrivateKey)
 		messages[i] = []byte("benchmark message")
-		signatures[i], err = cpriv.SignMessage(messages[i], rand.Reader)
+		signatures[i], err = cpriv.SignMessage(messages[i], rand.Reader, nil)
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -123,10 +122,10 @@ func BenchmarkBatchVerifier(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		batchVerifier := NewBatchVerifier()
+		batchVerifier := NewBatchVerifier(nil)
 
 		for j := 0; j < batchSize; j++ {
-			err := batchVerifier.Add(pubs[j], messages[j], signatures[j])
+			err := batchVerifier.Add(pubs[j], messages[j], nil, signatures[j], nil)
 			if err != nil {
 				b.Fatal(err)
 			}
@@ -147,7 +146,7 @@ func BenchmarkBatchVerifier(b *testing.B) {
 
 // BenchmarkConcurrentOperations benchmarks concurrent crypto operations
 func BenchmarkConcurrentOperations(b *testing.B) {
-	crypt, err := New(crypto.SHA256)
+	crypt, err := New(nil)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -167,7 +166,7 @@ func BenchmarkConcurrentOperations(b *testing.B) {
 		pubs[i] = cpub.(PublicKey)
 		privs[i] = cpriv.(PrivateKey)
 		messages[i] = []byte("concurrent benchmark message")
-		signatures[i], err = cpriv.SignMessage(messages[i], rand.Reader)
+		signatures[i], err = cpriv.SignMessage(messages[i], rand.Reader, nil)
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -180,7 +179,7 @@ func BenchmarkConcurrentOperations(b *testing.B) {
 		for pb.Next() {
 			// Round-robin through the test data
 			idx := i % numKeys
-			valid, err := pubs[idx].VerifyMessage(messages[idx], signatures[idx])
+			valid, err := pubs[idx].VerifyMessage(messages[idx], signatures[idx], nil)
 			if err != nil {
 				b.Fatal(err)
 			}

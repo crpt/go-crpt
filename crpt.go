@@ -97,9 +97,21 @@ type UntypedKey[T any] interface {
 	Untyped[T]
 
 	// KeyType returns the key type.
+	//
+	// PublicKey/PrivateKey implementations generally don't need to implement this method as it is
+	// already implemented by embedded BasePublicKey/BasePrivateKey.
 	KeyType() KeyType
 
+	// SignerOpts reports the default SignerOpts use by this key.
+	//
+	// PublicKey/PrivateKey implementations generally don't need to implement this method as it is
+	// already implemented by embedded BasePublicKey/BasePrivateKey.
+	SignerOpts() crypto.SignerOpts
+
 	// ToTyped returns the typed bytes representation of the key.
+	//
+	// PublicKey/PrivateKey implementations generally don't need to implement this method as it is
+	// already implemented by embedded BasePublicKey/BasePrivateKey.
 	ToTyped() Typed[T]
 }
 
@@ -116,7 +128,6 @@ type PublicKey interface {
 	// Verify reports whether `sig` is a valid signature of message or digest by the public key.
 	//
 	// In most case, it is recommended to use Verify instead of VerifyMessage or VerifyDigest.
-	//If not providing digest (nil or empty), the caller can pass NotHashed as the value for hashFunc.
 	//
 	// If digest is provided (not empty), and the Crpt implementation is appropriate for signing the
 	// pre-hashed messages (see SignMessage for details), Verify should try VerifyDigest first, then
@@ -124,19 +135,19 @@ type PublicKey interface {
 	//
 	// Crpt implementations generally don't need to implement this method as it is
 	// already implemented by embedded BaseCrpt.
-	Verify(message, digest []byte, hashFunc crypto.Hash, sig Signature) (bool, error)
+	Verify(message, digest []byte, sig Signature, opts crypto.SignerOpts) (bool, error)
 
 	// VerifyMessage reports whether `sig` is a valid signature of message by the public key.
-	VerifyMessage(message []byte, sig Signature) (bool, error)
+	VerifyMessage(message []byte, sig Signature, opts crypto.SignerOpts) (bool, error)
 
 	// VerifyDigest reports whether `sig` is a valid signature of digest by the public key.
 	//
-	// The caller must hash the message and pass the hash (as digest) and the hash
-	// function used (as hashFunc) to SignDigest.
+	// The caller must hash the message and pass the hash (as digest) and the appropriate crypto.SignerOpts
+	// so opts.HashFunc() returns the function used to SignDigest.
 	//
 	// Some Crpt implementations are not appropriate for signing the pre-hashed messages, which will
 	// return ErrUnimplemented.
-	VerifyDigest(digest []byte, hashFunc crypto.Hash, sig Signature) (bool, error)
+	VerifyDigest(digest []byte, sig Signature, opts crypto.SignerOpts) (bool, error)
 }
 
 // PrivateKey represents a private key with a specific key type.
@@ -158,12 +169,13 @@ type PrivateKey interface {
 	// for signing the pre-hashed messages (see SignMessage for details), Sign should
 	// just call SignDigest, otherwise it should just call SignMessage.
 	//
-	// Crpt implementations generally don't need to implement this method as it is
-	// already implemented by embedded BaseCrpt.
-	Sign(message, digest []byte, hashFunc crypto.Hash, rand io.Reader) (Signature, error)
+	// PrivateKey implementations generally don't need to implement this method as it is
+	// already implemented by embedded BasePrivateKey.
+	Sign(message, digest []byte, rand io.Reader, opts crypto.SignerOpts) (Signature, error)
 
 	// SignMessage directly signs message with `priv`, possibly using entropy from rand.
-	SignMessage(message []byte, rand io.Reader) (Signature, error)
+	// Implementations should always use crpt.NotHashed and ignore opts.HashFunc().
+	SignMessage(message []byte, rand io.Reader, opts crypto.SignerOpts) (Signature, error)
 
 	// SignDigest signs digest with `priv` and returns a Signature, possibly using entropy from rand.
 	//
@@ -172,7 +184,7 @@ type PrivateKey interface {
 	//
 	// Some Crpt implementations are not appropriate for signing the pre-hashed messages, which will
 	// return ErrUnimplemented.
-	SignDigest(digest []byte, hashFunc crypto.Hash, rand io.Reader) (Signature, error)
+	SignDigest(digest []byte, rand io.Reader, opts crypto.SignerOpts) (Signature, error)
 }
 
 // Signature represents a digital signature produced by signing a message.
@@ -221,6 +233,12 @@ type Crpt interface {
 	// already implemented by embedded BaseCrpt.
 	KeyType() KeyType
 
+	// SignerOpts reports the default SignerOpts use by this Crpt instance.
+	//
+	// Crpt implementations generally don't need to implement this method as it is
+	// already implemented by embedded BaseCrpt.
+	SignerOpts() crypto.SignerOpts
+
 	// HashFunc reports the hash function to be used for Crpt.Hash.
 	//
 	// Crpt implementations generally don't need to implement this method as it is
@@ -262,6 +280,10 @@ type Crpt interface {
 
 	// GenerateKey generates a public/private key pair using entropy from rand.
 	GenerateKey(rand io.Reader) (PublicKey, PrivateKey, error)
+
+	// NewBatchVerifier creates a new batch verifier for this key type with the given options.
+	// Returns ErrUnimplemented if batch verification is not supported for this key type.
+	NewBatchVerifier(opts crypto.SignerOpts) (BatchVerifier, error)
 
 	// MerkleHashFromByteSlices computes a Merkle tree where the leaves are the byte slice,
 	// in the provided order. It follows RFC-6962.
@@ -380,49 +402,59 @@ func GenerateKey(t KeyType, rand io.Reader) (PublicKey, PrivateKey, error) {
 	return crpts[t].GenerateKey(rand)
 }
 
+// NewBatchVerifier creates a new batch verifier for this key type with the given options.
+// Returns ErrUnimplemented if batch verification is not supported for this key type.
+func NewBatchVerifier(t KeyType, opts crypto.SignerOpts) (BatchVerifier, error) {
+	if !t.Available() {
+		return nil, ErrKeyTypeNotSupported
+	}
+	return crpts[t].NewBatchVerifier(opts)
+}
+
 // Sign signs message or digest and returns a Signature, possibly using entropy from rand.
 //
 // See PrivateKey.Sign for more details.
-func Sign(priv PrivateKey, message, digest []byte, hashFunc crypto.Hash, rand io.Reader,
+func Sign(priv PrivateKey, message, digest []byte, rand io.Reader, opts crypto.SignerOpts,
 ) (Signature, error) {
-	return priv.Sign(message, digest, hashFunc, rand)
+	return priv.Sign(message, digest, rand, opts)
 }
 
 // SignMessage directly signs message with `priv`, possibly using entropy from rand.
+// Implementations should always use crpt.NotHashed and ignore opts.HashFunc().
 //
 // See PrivateKey.SignMessage for more details.
-func SignMessage(priv PrivateKey, message []byte, rand io.Reader,
+func SignMessage(priv PrivateKey, message []byte, rand io.Reader, opts crypto.SignerOpts,
 ) (Signature, error) {
-	return priv.SignMessage(message, rand)
+	return priv.SignMessage(message, rand, opts)
 }
 
 // SignDigest signs digest with `priv` and returns a Signature, possibly using entropy from rand.
 //
 // See PrivateKey.SignDigest for more details.
-func SignDigest(priv PrivateKey, digest []byte, hashFunc crypto.Hash, rand io.Reader,
+func SignDigest(priv PrivateKey, digest []byte, rand io.Reader, opts crypto.SignerOpts,
 ) (Signature, error) {
-	return priv.SignDigest(digest, hashFunc, rand)
+	return priv.SignDigest(digest, rand, opts)
 }
 
 // Verify reports whether `sig` is a valid signature of message or digest by `pub`.
 //
 // See PublicKey.Verify for more details.
-func Verify(pub PublicKey, message, digest []byte, hashFunc crypto.Hash, sig Signature) (bool, error) {
-	return pub.Verify(message, digest, hashFunc, sig)
+func Verify(pub PublicKey, message, digest []byte, sig Signature, opts crypto.SignerOpts) (bool, error) {
+	return pub.Verify(message, digest, sig, opts)
 }
 
 // VerifyMessage reports whether `sig` is a valid signature of message by `pub`.
 //
 // See PublicKey.VerifyMessage for more details.
-func VerifyMessage(pub PublicKey, message []byte, sig Signature) (bool, error) {
-	return pub.VerifyMessage(message, sig)
+func VerifyMessage(pub PublicKey, message []byte, sig Signature, opts crypto.SignerOpts) (bool, error) {
+	return pub.VerifyMessage(message, sig, opts)
 }
 
 // VerifyDigest reports whether `sig` is a valid signature of digest by `pub`.
 //
 // See PublicKey.VerifyDigest for more details.
-func VerifyDigest(pub PublicKey, digest []byte, hashFunc crypto.Hash, sig Signature) (bool, error) {
-	return pub.VerifyDigest(digest, hashFunc, sig)
+func VerifyDigest(pub PublicKey, digest []byte, sig Signature, opts crypto.SignerOpts) (bool, error) {
+	return pub.VerifyDigest(digest, sig, opts)
 }
 
 /* Batch */
@@ -433,7 +465,11 @@ func VerifyDigest(pub PublicKey, digest []byte, hashFunc crypto.Hash, sig Signat
 // the key type must be registered in `github.com/crpt/go-crpt/batch`
 type BatchVerifier interface {
 	// Add appends an entry into the BatchVerifier.
-	Add(key PublicKey, message []byte, sig Signature) error
+	//
+	// If digest is provided (not empty), and the Crpt implementation is appropriate for signing the
+	// pre-hashed messages (see SignMessage for details), Verify should try VerifyDigest first, then
+	// it should try VerifyMessage, it should returns true if either returns true.
+	Add(key PublicKey, message, digest []byte, sig Signature, opts crypto.SignerOpts) error
 
 	// Verify verifies all the entries in the BatchVerifier, and returns
 	// if every signature in the batch is valid, and a vector of bools

@@ -21,15 +21,15 @@ func (m *mockCrpt) GenerateKey(rand io.Reader) (PublicKey, PrivateKey, error) {
 	return nil, nil, nil
 }
 
-func (m *mockCrpt) Sign(priv PrivateKey, message, digest []byte, hashFunc crypto.Hash, rand io.Reader) (Signature, error) {
+func (m *mockCrpt) Sign(priv PrivateKey, message, digest []byte, rand io.Reader, opts crypto.SignerOpts) (Signature, error) {
 	return nil, nil
 }
 
-func (m *mockCrpt) SignMessage(priv PrivateKey, message []byte, rand io.Reader) (Signature, error) {
+func (m *mockCrpt) SignMessage(priv PrivateKey, message []byte, rand io.Reader, opts crypto.SignerOpts) (Signature, error) {
 	return nil, nil
 }
 
-func (m *mockCrpt) SignDigest(priv PrivateKey, digest []byte, hashFunc crypto.Hash, rand io.Reader) (Signature, error) {
+func (m *mockCrpt) SignDigest(priv PrivateKey, digest []byte, rand io.Reader, opts crypto.SignerOpts) (Signature, error) {
 	return nil, nil
 }
 
@@ -61,28 +61,32 @@ func (m *mockCrpt) SignatureToTyped(sig Signature) (TypedSignature, error) {
 	return nil, nil
 }
 
+func (m *mockCrpt) NewBatchVerifier(opts crypto.SignerOpts) (BatchVerifier, error) {
+	return nil, nil
+}
+
 func TestNewBaseCrpt(t *testing.T) {
 	tests := []struct {
-		name       string
-		keyType    KeyType
-		hashFunc   crypto.Hash
-		parentCrpt Crpt
-		wantErr    bool
-		panicMsg   string
+		name     string
+		keyType  KeyType
+		hashFunc crypto.Hash
+		parent   Crpt
+		wantErr  bool
+		panicMsg string
 	}{
 		{
-			name:       "Valid parameters should work",
-			keyType:    Ed25519,
-			hashFunc:   crypto.SHA256,
-			parentCrpt: &mockCrpt{},
-			wantErr:    false,
+			name:     "Valid parameters should work",
+			keyType:  Ed25519,
+			hashFunc: crypto.SHA512,
+			parent:   &mockCrpt{},
+			wantErr:  false,
 		},
 		{
-			name:       "Zero hash function should work",
-			keyType:    Ed25519,
-			hashFunc:   0,
-			parentCrpt: &mockCrpt{},
-			wantErr:    false,
+			name:     "Zero hash function should work",
+			keyType:  Ed25519,
+			hashFunc: 0,
+			parent:   &mockCrpt{},
+			wantErr:  false,
 		},
 	}
 
@@ -98,7 +102,7 @@ func TestNewBaseCrpt(t *testing.T) {
 				}()
 			}
 
-			got, err := NewBaseCrpt(tt.keyType, tt.hashFunc, tt.parentCrpt)
+			got, err := NewBaseCrpt(tt.keyType, tt.hashFunc, tt.parent)
 
 			if tt.wantErr {
 				require.Error(t, err)
@@ -114,37 +118,25 @@ func TestNewBaseCrpt(t *testing.T) {
 }
 
 func TestNewBaseCrpt_ErrorCases(t *testing.T) {
-	t.Run("Nil parent should panic", func(t *testing.T) {
-		defer func() {
-			if r := recover(); r != nil {
-				require.Contains(t, r.(string), "implementations should always pass parentCrpt")
-			} else {
-				t.Error("Expected panic for nil parentCrpt")
-			}
-		}()
-
-		_, _ = NewBaseCrpt(Ed25519, crypto.SHA256, nil)
+	t.Run("Nil parent should return error", func(t *testing.T) {
+		_, err := NewBaseCrpt(Ed25519, crypto.SHA512, nil)
+		require.Error(t, err)
+		require.ErrorIs(t, err, ErrParentIsNil)
 	})
 
-	t.Run("Unavailable hash function should panic", func(t *testing.T) {
+	t.Run("Unavailable hash function should return error", func(t *testing.T) {
 		// Use a hash function that's likely not available
 		unavailableHash := crypto.Hash(999) // Very unlikely to exist
 
-		defer func() {
-			if r := recover(); r != nil {
-				require.Contains(t, r.(string), "crypto: requested hash function #999 is unavailable")
-			} else {
-				t.Error("Expected panic for unavailable hash function")
-			}
-		}()
-
-		_, _ = NewBaseCrpt(Ed25519, unavailableHash, &mockCrpt{})
+		_, err := NewBaseCrpt(Ed25519, unavailableHash, &mockCrpt{})
+		require.Error(t, err)
+		require.ErrorIs(t, err, ErrInvalidHashFunc)
 	})
 }
 
 func TestBaseCrpt_KeyType(t *testing.T) {
 	mock := &mockCrpt{}
-	base, err := NewBaseCrpt(Ed25519, crypto.SHA256, mock)
+	base, err := NewBaseCrpt(Ed25519, crypto.SHA512, mock)
 	require.NoError(t, err)
 
 	require.Equal(t, Ed25519, base.KeyType())
@@ -173,13 +165,13 @@ func TestBaseCrpt_HashFunc(t *testing.T) {
 
 func TestBaseCrpt_Hash(t *testing.T) {
 	mock := &mockCrpt{}
-	base, err := NewBaseCrpt(Ed25519, crypto.SHA256, mock)
+	base, err := NewBaseCrpt(Ed25519, crypto.SHA512, mock)
 	require.NoError(t, err)
 
 	message := []byte("test message")
 	hash := base.Hash(message)
 	require.NotEmpty(t, hash)
-	require.Len(t, hash, 32) // SHA256 produces 32-byte hash
+	require.Len(t, hash, 64) // SHA512 produces 64-byte hash
 
 	// Test deterministic behavior
 	hash2 := base.Hash(message)
@@ -193,16 +185,16 @@ func TestBaseCrpt_Hash(t *testing.T) {
 
 func TestBaseCrpt_HashTyped(t *testing.T) {
 	mock := &mockCrpt{}
-	base, err := NewBaseCrpt(Ed25519, crypto.SHA256, mock)
+	base, err := NewBaseCrpt(Ed25519, crypto.SHA512, mock)
 	require.NoError(t, err)
 
 	message := []byte("test message")
 	typedHash := base.HashTyped(message)
 	require.NotEmpty(t, typedHash)
-	require.Len(t, typedHash, 32) // SHA256 hash length
+	require.Len(t, typedHash, 64) // SHA512 hash length
 
 	// Verify it contains the hashFuncByte at index 0 (overwriting the first byte of hash)
-	require.Equal(t, byte(crypto.SHA256), typedHash[0])
+	require.Equal(t, byte(crypto.SHA512), typedHash[0])
 
 	// Verify the hash has the correct length (same as raw hash, but with first byte overwritten)
 	rawHash := base.Hash(message)
@@ -215,50 +207,50 @@ func TestBaseCrpt_HashTyped(t *testing.T) {
 
 func TestBaseCrpt_SumHashTyped(t *testing.T) {
 	mock := &mockCrpt{}
-	base, err := NewBaseCrpt(Ed25519, crypto.SHA256, mock)
+	base, err := NewBaseCrpt(Ed25519, crypto.SHA512, mock)
 	require.NoError(t, err)
 
 	data := []byte("test data for sum")
 
 	// Create a hash instance manually
-	hasher := crypto.SHA256.New()
+	hasher := crypto.SHA512.New()
 	typedHash := base.SumHashTyped(hasher, data)
 	require.NotEmpty(t, typedHash)
 
 	// The result should be: data + hashFuncByte + remaining_31_bytes_of_hash
-	expectedLen := len(data) + 32 // data + hash (with first byte overwritten)
+	expectedLen := len(data) + 64 // data + hash (with first byte overwritten)
 	require.Len(t, typedHash, expectedLen)
 
 	// Verify it contains the original data
 	require.Equal(t, data, typedHash[:len(data)])
 
 	// Verify it contains the hashFuncByte right after the data
-	require.Equal(t, byte(crypto.SHA256), typedHash[len(data)])
+	require.Equal(t, byte(crypto.SHA512), typedHash[len(data)])
 
 	// Verify there are remaining hash bytes (should be 31 bytes)
-	require.Len(t, typedHash[len(data)+1:], 31)
+	require.Len(t, typedHash[len(data)+1:], 63)
 }
 
 func TestBaseCrpt_HashToTyped(t *testing.T) {
 	mock := &mockCrpt{}
-	base, err := NewBaseCrpt(Ed25519, crypto.SHA256, mock)
+	base, err := NewBaseCrpt(Ed25519, crypto.SHA512, mock)
 	require.NoError(t, err)
 
-	hash := make([]byte, 32)
+	hash := make([]byte, 64)
 	for i := range hash {
 		hash[i] = byte(i)
 	}
 
 	typedHash := base.HashToTyped(hash)
 	require.NotEmpty(t, typedHash)
-	require.Len(t, typedHash, 32) // Same length as original hash (this is the implementation's behavior)
-	require.Equal(t, byte(crypto.SHA256), typedHash[0])
+	require.Len(t, typedHash, 64) // Same length as original hash (this is the implementation's behavior)
+	require.Equal(t, byte(crypto.SHA512), typedHash[0])
 	require.Equal(t, hash[1:], []byte(typedHash[1:]))
 }
 
 func TestBaseCrpt_MerkleHashFromByteSlices(t *testing.T) {
 	mock := &mockCrpt{}
-	base, err := NewBaseCrpt(Ed25519, crypto.SHA256, mock)
+	base, err := NewBaseCrpt(Ed25519, crypto.SHA512, mock)
 	require.NoError(t, err)
 
 	tests := []struct {
@@ -294,20 +286,20 @@ func TestBaseCrpt_MerkleHashFromByteSlices(t *testing.T) {
 
 func TestBaseCrpt_MerkleHashTypedFromByteSlices(t *testing.T) {
 	mock := &mockCrpt{}
-	base, err := NewBaseCrpt(Ed25519, crypto.SHA256, mock)
+	base, err := NewBaseCrpt(Ed25519, crypto.SHA512, mock)
 	require.NoError(t, err)
 
 	items := [][]byte{[]byte("item1"), []byte("item2")}
 	typedRootHash := base.MerkleHashTypedFromByteSlices(items)
 
 	require.NotEmpty(t, typedRootHash)
-	require.Len(t, typedRootHash, 32)
-	require.Equal(t, byte(crypto.SHA256), typedRootHash[0])
+	require.Len(t, typedRootHash, 64)
+	require.Equal(t, byte(crypto.SHA512), typedRootHash[0])
 }
 
 func TestBaseCrpt_MerkleProofsFromByteSlices(t *testing.T) {
 	mock := &mockCrpt{}
-	base, err := NewBaseCrpt(Ed25519, crypto.SHA256, mock)
+	base, err := NewBaseCrpt(Ed25519, crypto.SHA512, mock)
 	require.NoError(t, err)
 
 	items := [][]byte{[]byte("item1"), []byte("item2"), []byte("item3")}
@@ -325,7 +317,7 @@ func TestBaseCrpt_MerkleProofsFromByteSlices(t *testing.T) {
 
 func TestBaseCrpt_MerkleProofsTypedFromByteSlices(t *testing.T) {
 	mock := &mockCrpt{}
-	base, err := NewBaseCrpt(Ed25519, crypto.SHA256, mock)
+	base, err := NewBaseCrpt(Ed25519, crypto.SHA512, mock)
 	require.NoError(t, err)
 
 	items := [][]byte{[]byte("item1"), []byte("item2")}
@@ -341,19 +333,19 @@ func TestBaseCrpt_MerkleProofsTypedFromByteSlices(t *testing.T) {
 	}
 }
 
-func TestBaseCrpt_ParentCrpt(t *testing.T) {
+func TestBaseCrpt_Parent(t *testing.T) {
 	parent := &mockCrpt{}
-	base, err := NewBaseCrpt(Ed25519, crypto.SHA256, parent)
+	base, err := NewBaseCrpt(Ed25519, crypto.SHA512, parent)
 	require.NoError(t, err)
 
 	// Verify parent reference is stored
-	require.Equal(t, parent, base.parentCrpt)
+	require.Equal(t, parent, base.parent)
 }
 
 // Benchmark tests for BaseCrpt methods
 func BenchmarkBaseCrpt_Hash(b *testing.B) {
 	mock := &mockCrpt{}
-	base, err := NewBaseCrpt(Ed25519, crypto.SHA256, mock)
+	base, err := NewBaseCrpt(Ed25519, crypto.SHA512, mock)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -368,7 +360,7 @@ func BenchmarkBaseCrpt_Hash(b *testing.B) {
 
 func BenchmarkBaseCrpt_HashTyped(b *testing.B) {
 	mock := &mockCrpt{}
-	base, err := NewBaseCrpt(Ed25519, crypto.SHA256, mock)
+	base, err := NewBaseCrpt(Ed25519, crypto.SHA512, mock)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -383,7 +375,7 @@ func BenchmarkBaseCrpt_HashTyped(b *testing.B) {
 
 func BenchmarkBaseCrpt_MerkleHashFromByteSlices(b *testing.B) {
 	mock := &mockCrpt{}
-	base, err := NewBaseCrpt(Ed25519, crypto.SHA256, mock)
+	base, err := NewBaseCrpt(Ed25519, crypto.SHA512, mock)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -407,7 +399,7 @@ func BenchmarkBaseCrpt_MerkleHashFromByteSlices(b *testing.B) {
 
 func BenchmarkBaseCrpt_MerkleHashTypedFromByteSlices(b *testing.B) {
 	mock := &mockCrpt{}
-	base, err := NewBaseCrpt(Ed25519, crypto.SHA256, mock)
+	base, err := NewBaseCrpt(Ed25519, crypto.SHA512, mock)
 	if err != nil {
 		b.Fatal(err)
 	}

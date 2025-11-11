@@ -90,11 +90,11 @@ func TestNew(t *testing.T) {
 
 				// Test signing and verification
 				message := []byte("test message")
-				sig, err := priv.SignMessage(message, rand.Reader)
+				sig, err := priv.SignMessage(message, rand.Reader, nil)
 				assert.NoError(t, err)
 				assert.NotNil(t, sig)
 
-				valid, err := pub.VerifyMessage(message, sig)
+				valid, err := pub.VerifyMessage(message, sig, nil)
 				assert.NoError(t, err)
 				assert.True(t, valid)
 			}
@@ -180,9 +180,9 @@ func TestMustNew_HashFunctionPanic(t *testing.T) {
 			// Check if it contains an error message (string or error type)
 			switch v := r.(type) {
 			case string:
-				assert.Contains(t, v, "unavailable")
+				assert.Contains(t, v, crpt.ErrInvalidHashFunc.Error())
 			case error:
-				assert.Contains(t, v.Error(), "unavailable")
+				assert.Contains(t, v.Error(), crpt.ErrInvalidHashFunc.Error())
 			default:
 				t.Errorf("Expected panic to contain string or error, got %T", r)
 			}
@@ -198,10 +198,10 @@ func TestMustNew_HashFunctionPanic(t *testing.T) {
 
 func TestFactory_EdgeCases(t *testing.T) {
 	t.Run("Multiple instances should be independent", func(t *testing.T) {
-		crypt1, err := New(crpt.Ed25519, crypto.SHA256)
+		crypt1, err := New(crpt.Ed25519, crypto.SHA512)
 		require.NoError(t, err)
 
-		crypt2, err := New(crpt.Ed25519, crypto.SHA256)
+		crypt2, err := New(crpt.Ed25519, crypto.SHA512)
 		require.NoError(t, err)
 
 		// Generate different keys from each instance
@@ -217,23 +217,23 @@ func TestFactory_EdgeCases(t *testing.T) {
 
 		// Signatures should work with their respective keys
 		message := []byte("test message")
-		sig1, err := priv1.SignMessage(message, rand.Reader)
+		sig1, err := priv1.SignMessage(message, rand.Reader, nil)
 		require.NoError(t, err)
 
-		sig2, err := priv2.SignMessage(message, rand.Reader)
+		sig2, err := priv2.SignMessage(message, rand.Reader, nil)
 		require.NoError(t, err)
 
 		// Verify signatures
-		valid1, err := pub1.VerifyMessage(message, sig1)
+		valid1, err := pub1.VerifyMessage(message, sig1, nil)
 		require.NoError(t, err)
 		assert.True(t, valid1)
 
-		valid2, err := pub2.VerifyMessage(message, sig2)
+		valid2, err := pub2.VerifyMessage(message, sig2, nil)
 		require.NoError(t, err)
 		assert.True(t, valid2)
 
 		// Cross-verification should fail
-		crossValid1, err := pub1.VerifyMessage(message, sig2)
+		crossValid1, err := pub1.VerifyMessage(message, sig2, nil)
 		require.NoError(t, err)
 		assert.False(t, crossValid1)
 	})
@@ -257,10 +257,10 @@ func TestFactory_EdgeCases(t *testing.T) {
 			require.NoError(t, err)
 
 			message := []byte("test message")
-			sig, err := priv.SignMessage(message, rand.Reader)
+			sig, err := priv.SignMessage(message, rand.Reader, nil)
 			require.NoError(t, err)
 
-			valid, err := pub.VerifyMessage(message, sig)
+			valid, err := pub.VerifyMessage(message, sig, nil)
 			require.NoError(t, err)
 			assert.True(t, valid)
 		}
@@ -270,7 +270,7 @@ func TestFactory_EdgeCases(t *testing.T) {
 // Benchmark tests for factory functions
 func BenchmarkFactory_New(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		_, err := New(crpt.Ed25519, crypto.SHA256)
+		_, err := New(crpt.Ed25519, crypto.SHA512)
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -279,7 +279,7 @@ func BenchmarkFactory_New(b *testing.B) {
 
 func BenchmarkFactory_MustNew(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		crypt := MustNew(crpt.Ed25519, crypto.SHA256)
+		crypt := MustNew(crpt.Ed25519, crypto.SHA512)
 		_ = crypt
 	}
 }
@@ -302,7 +302,7 @@ func BenchmarkFactory_CreationWithDifferentHashes(b *testing.B) {
 }
 
 func BenchmarkFactory_InstanceUsage(b *testing.B) {
-	crypt := MustNew(crpt.Ed25519, crypto.SHA256)
+	crypt := MustNew(crpt.Ed25519, crypto.SHA512)
 
 	// Pre-generate keys for benchmarking
 	pub, priv, err := crypt.GenerateKey(rand.Reader)
@@ -311,7 +311,7 @@ func BenchmarkFactory_InstanceUsage(b *testing.B) {
 	}
 
 	message := []byte("benchmark message")
-	sig, err := priv.SignMessage(message, rand.Reader)
+	sig, err := priv.SignMessage(message, rand.Reader, nil)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -319,7 +319,7 @@ func BenchmarkFactory_InstanceUsage(b *testing.B) {
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		valid, err := pub.VerifyMessage(message, sig)
+		valid, err := pub.VerifyMessage(message, sig, nil)
 		if err != nil {
 			b.Fatal(err)
 		}
