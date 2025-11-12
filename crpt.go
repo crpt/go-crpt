@@ -21,6 +21,7 @@ type KeyType uint8
 
 const (
 	Ed25519 KeyType = 1 + iota
+	SM2
 	// This may change as new implementations come out.
 	MaxCrpt
 )

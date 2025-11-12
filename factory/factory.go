@@ -10,6 +10,7 @@ import (
 
 	"github.com/crpt/go-crpt"
 	"github.com/crpt/go-crpt/ed25519"
+	"github.com/crpt/go-crpt/sm2"
 )
 
 // New creates a Crpt instance with the specified KeyType and default signer options.
@@ -17,6 +18,8 @@ func New(keyType crpt.KeyType, opts crypto.SignerOpts) (crpt.Crpt, error) {
 	switch keyType {
 	case crpt.Ed25519:
 		return ed25519.NewWithCryptoSignerOpts(opts)
+	case crpt.SM2:
+		return sm2.NewWithCryptoSignerOpts(opts)
 	default:
 		return nil, crpt.ErrKeyTypeNotSupported
 	}
@@ -30,6 +33,8 @@ func MustNew(keyType crpt.KeyType, opts crypto.SignerOpts) crpt.Crpt {
 	switch keyType {
 	case crpt.Ed25519:
 		crypt, err = ed25519.NewWithCryptoSignerOpts(opts)
+	case crpt.SM2:
+		crypt, err = sm2.NewWithCryptoSignerOpts(opts)
 	default:
 		panic(crpt.ErrKeyTypeNotSupported)
 	}
