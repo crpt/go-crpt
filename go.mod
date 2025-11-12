@@ -5,6 +5,7 @@ go 1.25
 require (
 	github.com/crpt/go-merkle v0.0.0-20211202024952-07ef5d0dcfc0
 	github.com/daotl/guts v0.0.0-20211209102048-f83c8ade78e8
+	github.com/emmansun/gmsm v0.40.0
 	github.com/multiformats/go-multihash v0.2.3
 	github.com/oasisprotocol/curve25519-voi v0.0.0-20211129104401-1d84291be125
 	github.com/stretchr/testify v1.11.1
