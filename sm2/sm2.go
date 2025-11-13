@@ -8,6 +8,7 @@ package sm2
 import (
 	"crypto"
 	"crypto/ecdsa"
+	"crypto/elliptic"
 	crand "crypto/rand"
 	"crypto/subtle"
 	"encoding/asn1"
@@ -247,16 +248,12 @@ func (priv PrivateKey) Bytes() []byte {
 	return out
 }
 
-// normal PublicKey will never trigger panic in this func
 func (priv PrivateKey) Public() crpt.PublicKey {
-	pubKey := &priv.priv.PublicKey
-	raw, err := pubKey.Bytes()
-	if err != nil {
-		panic(errors.New("failed to marshal public key: " + err.Error()))
-	}
+	pubKey := priv.priv.PublicKey
+	raw := elliptic.Marshal(pubKey.Curve, priv.priv.PublicKey.X, priv.priv.PublicKey.Y)
 	pub := &PublicKey{
 		raw:      raw,
-		ecdsaPub: &priv.priv.PublicKey,
+		ecdsaPub: &pubKey,
 	}
 	pub.BasePublicKey = &crpt.BasePublicKey{
 		BaseKey: &crpt.BaseKey{
