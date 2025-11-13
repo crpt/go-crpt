@@ -119,6 +119,7 @@ func NewPublicKey(b []byte, opts crypto.SignerOpts) (*PublicKey, error) {
 	if opts == nil {
 		opts = cloneSignerOpts(nil)
 	}
+	sops := ConvertSignerOpts(opts, *DefaultSignerOpts)
 	ecdsaPub, err := gsm2.NewPublicKey(b)
 	if err != nil {
 		return nil, err
@@ -131,7 +132,7 @@ func NewPublicKey(b []byte, opts crypto.SignerOpts) (*PublicKey, error) {
 	pub.BasePublicKey = &crpt.BasePublicKey{
 		BaseKey: &crpt.BaseKey{
 			Type: KeyType,
-			Sops: opts,
+			Sops: sops,
 		},
 		Parent: pub,
 	}
@@ -172,8 +173,7 @@ func (pub PublicKey) VerifyMessage(message []byte, sig crpt.Signature, opts cryp
 	if message == nil {
 		message = []byte{}
 	}
-	base := ConvertSignerOpts(pub.SignerOpts(), *DefaultSignerOpts)
-	sops := ConvertSignerOpts(opts, *base)
+	sops := ConvertSignerOpts(opts, *pub.SignerOpts().(*SignerOpts))
 	digest, err := gsm2.CalculateSM2Hash(pub.ecdsaPub, message, sops.UID)
 	if err != nil {
 		return false, err
@@ -193,8 +193,7 @@ func (pub PublicKey) VerifyDigest(digest []byte, sig crpt.Signature, opts crypto
 		return false, err
 	}
 
-	base := ConvertSignerOpts(pub.SignerOpts(), *DefaultSignerOpts)
-	sops := ConvertSignerOpts(opts, *base)
+	sops := ConvertSignerOpts(opts, *pub.SignerOpts().(*SignerOpts))
 	if !sops.Hash.Available() {
 		return false, crpt.ErrInvalidHashFunc
 	}
@@ -215,9 +214,7 @@ func NewPrivateKey(b []byte, opts crypto.SignerOpts) (*PrivateKey, error) {
 	if len(b) != PrivateKeySize {
 		return nil, ErrWrongPrivateKeySize
 	}
-	if opts == nil {
-		opts = cloneSignerOpts(nil)
-	}
+	sops := ConvertSignerOpts(opts, *DefaultSignerOpts)
 	priv, err := gsm2.NewPrivateKey(b)
 	if err != nil {
 		return nil, err
@@ -226,7 +223,7 @@ func NewPrivateKey(b []byte, opts crypto.SignerOpts) (*PrivateKey, error) {
 	p.BasePrivateKey = &crpt.BasePrivateKey{
 		BaseKey: &crpt.BaseKey{
 			Type: KeyType,
-			Sops: opts,
+			Sops: sops,
 		},
 		Parent: p,
 	}
@@ -275,8 +272,7 @@ func (priv PrivateKey) SignMessage(message []byte, rand io.Reader, opts crypto.S
 	if rand == nil {
 		rand = crand.Reader
 	}
-	base := ConvertSignerOpts(priv.SignerOpts(), *DefaultSignerOpts)
-	sops := ConvertSignerOpts(opts, *base)
+	sops := ConvertSignerOpts(opts, *priv.SignerOpts().(*SignerOpts))
 	sops.Hash = crpt.NotHashed
 	sig, err := priv.priv.Sign(rand, message, sops.toGMSM(true))
 	if err != nil {
@@ -293,8 +289,7 @@ func (priv PrivateKey) SignDigest(digest []byte, rand io.Reader, opts crypto.Sig
 	if rand == nil {
 		rand = crand.Reader
 	}
-	base := ConvertSignerOpts(priv.SignerOpts(), *DefaultSignerOpts)
-	sops := ConvertSignerOpts(opts, *base)
+	sops := ConvertSignerOpts(opts, *priv.SignerOpts().(*SignerOpts))
 	if !sops.Hash.Available() {
 		return nil, crpt.ErrInvalidHashFunc
 	}
