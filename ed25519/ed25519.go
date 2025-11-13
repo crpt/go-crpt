@@ -111,13 +111,14 @@ func NewPublicKey(b []byte, opts crypto.SignerOpts) (*PublicKey, error) {
 	if len(b) != PublicKeySize {
 		return nil, ErrWrongPublicKeySize
 	}
+	sops := ConvertSignerOpts(opts, *DefaultSignerOpts)
 	pub := &PublicKey{
 		vpub: b,
 	}
 	pub.BasePublicKey = &crpt.BasePublicKey{
 		BaseKey: &crpt.BaseKey{
 			Type: KeyType,
-			Sops: opts,
+			Sops: sops,
 		},
 		Parent: pub,
 	}
@@ -139,13 +140,14 @@ func NewPrivateKey(b []byte, opts crypto.SignerOpts) (*PrivateKey, error) {
 	if len(b) != PrivateKeySize {
 		return nil, ErrWrongPrivateKeySize
 	}
+	sops := ConvertSignerOpts(opts, *DefaultSignerOpts)
 	priv := &PrivateKey{
 		vpriv: b,
 	}
 	priv.BasePrivateKey = &crpt.BasePrivateKey{
 		BaseKey: &crpt.BaseKey{
 			Type: KeyType,
-			Sops: opts,
+			Sops: sops,
 		},
 		Parent: priv,
 	}
