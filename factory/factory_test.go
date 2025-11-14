@@ -196,6 +196,189 @@ func TestMustNew_HashFunctionPanic(t *testing.T) {
 	MustNew(crpt.Ed25519, unavailableHash)
 }
 
+func TestNewWithKeyTypeStr(t *testing.T) {
+	tests := []struct {
+		name       string
+		keyTypeStr string
+		hashFunc   crypto.Hash
+		wantErr    bool
+		errType    error
+	}{
+		{
+			name:       "Ed25519 string with SHA256 should work",
+			keyTypeStr: "Ed25519",
+			hashFunc:   crypto.SHA256,
+			wantErr:    false,
+		},
+		{
+			name:       "Ed25519 string with SHA512 should work",
+			keyTypeStr: "Ed25519",
+			hashFunc:   crypto.SHA512,
+			wantErr:    false,
+		},
+		{
+			name:       "Ed25519 string with zero hash function should work",
+			keyTypeStr: "Ed25519",
+			hashFunc:   0,
+			wantErr:    false,
+		},
+		{
+			name:       "SM2 string with SHA256 should work",
+			keyTypeStr: "SM2",
+			hashFunc:   crypto.SHA256,
+			wantErr:    false,
+		},
+		{
+			name:       "SM2 string with SHA512 should work",
+			keyTypeStr: "SM2",
+			hashFunc:   crypto.SHA512,
+			wantErr:    false,
+		},
+		{
+			name:       "Invalid key type string should fail",
+			keyTypeStr: "InvalidType",
+			hashFunc:   crypto.SHA256,
+			wantErr:    true,
+			errType:    crpt.ErrKeyTypeNotSupported,
+		},
+		{
+			name:       "Empty key type string should fail",
+			keyTypeStr: "",
+			hashFunc:   crypto.SHA256,
+			wantErr:    true,
+			errType:    crpt.ErrKeyTypeNotSupported,
+		},
+		{
+			name:       "Case sensitive Ed25519 lowercase should fail",
+			keyTypeStr: "ed25519",
+			hashFunc:   crypto.SHA256,
+			wantErr:    true,
+			errType:    crpt.ErrKeyTypeNotSupported,
+		},
+		{
+			name:       "Case sensitive SM2 lowercase should fail",
+			keyTypeStr: "sm2",
+			hashFunc:   crypto.SHA256,
+			wantErr:    true,
+			errType:    crpt.ErrKeyTypeNotSupported,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := NewWithKeyTypeStr(tt.keyTypeStr, tt.hashFunc)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+				if tt.errType != nil {
+					assert.ErrorIs(t, err, tt.errType)
+				}
+				assert.Nil(t, got)
+			} else {
+				assert.NoError(t, err)
+				assert.NotNil(t, got)
+
+				// Test that the returned instance works
+				expectedKeyType := crpt.StrToKeyType[tt.keyTypeStr]
+				assert.Equal(t, expectedKeyType, got.KeyType())
+				assert.Equal(t, tt.hashFunc, got.HashFunc())
+
+				// Test basic functionality
+				pub, priv, err := got.GenerateKey(rand.Reader)
+				assert.NoError(t, err)
+				assert.NotNil(t, pub)
+				assert.NotNil(t, priv)
+
+				// Test signing and verification
+				message := []byte("test message")
+				sig, err := priv.SignMessage(message, rand.Reader, nil)
+				assert.NoError(t, err)
+				assert.NotNil(t, sig)
+
+				valid, err := pub.VerifyMessage(message, sig, nil)
+				assert.NoError(t, err)
+				assert.True(t, valid)
+			}
+		})
+	}
+}
+
+func TestMustNewWithKeyTypeStr(t *testing.T) {
+	tests := []struct {
+		name        string
+		keyTypeStr  string
+		hashFunc    crypto.Hash
+		shouldPanic bool
+	}{
+		{
+			name:        "Ed25519 string with SHA256 should not panic",
+			keyTypeStr:  "Ed25519",
+			hashFunc:    crypto.SHA256,
+			shouldPanic: false,
+		},
+		{
+			name:        "Ed25519 string with SHA512 should not panic",
+			keyTypeStr:  "Ed25519",
+			hashFunc:    crypto.SHA512,
+			shouldPanic: false,
+		},
+		{
+			name:        "SM2 string with SHA256 should not panic",
+			keyTypeStr:  "SM2",
+			hashFunc:    crypto.SHA256,
+			shouldPanic: false,
+		},
+		{
+			name:        "Invalid key type string should panic",
+			keyTypeStr:  "InvalidType",
+			hashFunc:    crypto.SHA256,
+			shouldPanic: true,
+		},
+		{
+			name:        "Empty key type string should panic",
+			keyTypeStr:  "",
+			hashFunc:    crypto.SHA256,
+			shouldPanic: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.shouldPanic {
+				assert.Panics(t, func() {
+					MustNewWithKeyTypeStr(tt.keyTypeStr, tt.hashFunc)
+				})
+			} else {
+				assert.NotPanics(t, func() {
+					crypt := MustNewWithKeyTypeStr(tt.keyTypeStr, tt.hashFunc)
+					assert.NotNil(t, crypt)
+
+					// Test that the returned instance works
+					expectedKeyType := crpt.StrToKeyType[tt.keyTypeStr]
+					assert.Equal(t, expectedKeyType, crypt.KeyType())
+					assert.Equal(t, tt.hashFunc, crypt.HashFunc())
+
+					// Test basic functionality
+					pub, priv, err := crypt.GenerateKey(rand.Reader)
+					assert.NoError(t, err)
+					assert.NotNil(t, pub)
+					assert.NotNil(t, priv)
+
+					// Test signing and verification
+					message := []byte("test message")
+					sig, err := priv.SignMessage(message, rand.Reader, nil)
+					assert.NoError(t, err)
+					assert.NotNil(t, sig)
+
+					valid, err := pub.VerifyMessage(message, sig, nil)
+					assert.NoError(t, err)
+					assert.True(t, valid)
+				})
+			}
+		})
+	}
+}
+
 func TestFactory_EdgeCases(t *testing.T) {
 	t.Run("Multiple instances should be independent", func(t *testing.T) {
 		crypt1, err := New(crpt.Ed25519, crypto.SHA512)
@@ -265,66 +448,4 @@ func TestFactory_EdgeCases(t *testing.T) {
 			assert.True(t, valid)
 		}
 	})
-}
-
-// Benchmark tests for factory functions
-func BenchmarkFactory_New(b *testing.B) {
-	for i := 0; i < b.N; i++ {
-		_, err := New(crpt.Ed25519, crypto.SHA512)
-		if err != nil {
-			b.Fatal(err)
-		}
-	}
-}
-
-func BenchmarkFactory_MustNew(b *testing.B) {
-	for i := 0; i < b.N; i++ {
-		crypt := MustNew(crpt.Ed25519, crypto.SHA512)
-		_ = crypt
-	}
-}
-
-func BenchmarkFactory_CreationWithDifferentHashes(b *testing.B) {
-	hashFuncs := []crypto.Hash{
-		crypto.SHA256,
-		crypto.SHA512,
-		0,
-	}
-
-	for _, hf := range hashFuncs {
-		b.Run(crypto.Hash(hf).String(), func(b *testing.B) {
-			for i := 0; i < b.N; i++ {
-				crypt := MustNew(crpt.Ed25519, hf)
-				_ = crypt
-			}
-		})
-	}
-}
-
-func BenchmarkFactory_InstanceUsage(b *testing.B) {
-	crypt := MustNew(crpt.Ed25519, crypto.SHA512)
-
-	// Pre-generate keys for benchmarking
-	pub, priv, err := crypt.GenerateKey(rand.Reader)
-	if err != nil {
-		b.Fatal(err)
-	}
-
-	message := []byte("benchmark message")
-	sig, err := priv.SignMessage(message, rand.Reader, nil)
-	if err != nil {
-		b.Fatal(err)
-	}
-
-	b.ResetTimer()
-
-	for i := 0; i < b.N; i++ {
-		valid, err := pub.VerifyMessage(message, sig, nil)
-		if err != nil {
-			b.Fatal(err)
-		}
-		if !valid {
-			b.Fatal("verification failed")
-		}
-	}
 }

@@ -11,6 +11,7 @@ import (
 	"errors"
 	"hash"
 	"io"
+	"strconv"
 
 	"github.com/crpt/go-merkle"
 	gbytes "github.com/daotl/guts/bytes"
@@ -25,6 +26,30 @@ const (
 	// This may change as new implementations come out.
 	MaxCrpt
 )
+
+var KeyTypeToStr = map[KeyType]string{
+	Ed25519: "Ed25519",
+	SM2:     "SM2",
+}
+var StrToKeyType map[string]KeyType
+
+func init() {
+	StrToKeyType = make(map[string]KeyType, len(KeyTypeToStr))
+	for t, s := range KeyTypeToStr {
+		StrToKeyType[s] = t
+	}
+}
+
+func (h KeyType) String() string {
+	switch h {
+	case Ed25519:
+		return "Ed25519"
+	case SM2:
+		return "SM2"
+	default:
+		return "unknown key type value " + strconv.Itoa(int(h))
+	}
+}
 
 // Available reports whether the given KeyType implementation is available.
 func (t KeyType) Available() bool {
