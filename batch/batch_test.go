@@ -10,9 +10,11 @@ import (
 	"crypto/sha512"
 	"testing"
 
+	ved25519 "github.com/oasisprotocol/curve25519-voi/primitives/ed25519"
+	"github.com/stretchr/testify/require"
+
 	"github.com/crpt/go-crpt"
 	"github.com/crpt/go-crpt/ed25519"
-	"github.com/stretchr/testify/require"
 )
 
 func TestNewBatchVerifier(t *testing.T) {
@@ -201,7 +203,7 @@ func TestBatchVerifierWithDigest(t *testing.T) {
 	bvDigest, exists := NewBatchVerifier(ed25519.KeyType, crypto.SHA512)
 	require.True(t, exists)
 
-	opts := &ed25519.SignerOpts{Hash: crypto.SHA512}
+	opts := &ed25519.SignerOpts{Options: ved25519.Options{Hash: crypto.SHA512}}
 
 	err = bvDigest.Add(pub, nil, digest[:], sig2, opts)
 	require.NoError(t, err)
