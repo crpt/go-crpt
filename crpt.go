@@ -11,6 +11,8 @@ import (
 	"errors"
 	"hash"
 	"io"
+	"strconv"
+	"strings"
 
 	"github.com/crpt/go-merkle"
 	gbytes "github.com/daotl/guts/bytes"
@@ -20,11 +22,43 @@ import (
 type KeyType uint8
 
 const (
-	Ed25519 KeyType = 1 + iota
+	Unsupported KeyType = 0 + iota
+	Ed25519
 	SM2
 	// This may change as new implementations come out.
 	MaxCrpt
 )
+
+var KeyTypeToStr = map[KeyType]string{
+	Ed25519: "Ed25519",
+	SM2:     "SM2",
+}
+var StrToKeyType map[string]KeyType
+
+func init() {
+	StrToKeyType = make(map[string]KeyType, len(KeyTypeToStr))
+	for t, s := range KeyTypeToStr {
+		StrToKeyType[strings.ToLower(s)] = t
+	}
+}
+
+func KeyTypeFromStr(keyType string) KeyType {
+	if t, ok := StrToKeyType[strings.ToLower(keyType)]; ok {
+		return t
+	}
+	return Unsupported
+}
+
+func (h KeyType) String() string {
+	switch h {
+	case Ed25519:
+		return "Ed25519"
+	case SM2:
+		return "SM2"
+	default:
+		return "unknown key type value " + strconv.Itoa(int(h))
+	}
+}
 
 // Available reports whether the given KeyType implementation is available.
 func (t KeyType) Available() bool {
@@ -35,7 +69,7 @@ func (t KeyType) Available() bool {
 const NotHashed crypto.Hash = 0
 
 var (
-	ErrKeyTypeNotSupported  = errors.New("key type not supported")
+	ErrUnsupportedKeyType   = errors.New("unsupported key type")
 	ErrUnimplemented        = errors.New("not implemented")
 	ErrWrongPublicKeySize   = errors.New("wrong public key size")
 	ErrWrongPrivateKeySize  = errors.New("wrong private key size")
@@ -350,7 +384,7 @@ func TypedHashFromMultihash(mh multihash.Multihash) (TypedHash, error) {
 // PublicKeyFromBytes constructs a PublicKey from raw bytes.
 func PublicKeyFromBytes(t KeyType, pub []byte) (PublicKey, error) {
 	if t >= MaxCrpt || crpts[t] == nil {
-		return nil, ErrKeyTypeNotSupported
+		return nil, ErrUnsupportedKeyType
 	}
 	return crpts[t].PublicKeyFromBytes(pub)
 }
@@ -366,7 +400,7 @@ func PublicKeyFromTyped(pub Typed[PublicKey]) (PublicKey, error) {
 // PrivateKeyFromBytes constructs a PrivateKey from raw bytes.
 func PrivateKeyFromBytes(t KeyType, priv []byte) (PrivateKey, error) {
 	if !t.Available() {
-		return nil, ErrKeyTypeNotSupported
+		return nil, ErrUnsupportedKeyType
 	}
 	return crpts[t].PrivateKeyFromBytes(priv)
 }
@@ -382,7 +416,7 @@ func PrivateKeyFromTyped(priv Typed[PrivateKey]) (PrivateKey, error) {
 // SignatureToASN1 converts a Signature to ASN.1 DER encoding.
 func SignatureToASN1(t KeyType, sig Signature) ([]byte, error) {
 	if !t.Available() {
-		return nil, ErrKeyTypeNotSupported
+		return nil, ErrUnsupportedKeyType
 	}
 	return crpts[t].SignatureToASN1(sig)
 }
@@ -390,7 +424,7 @@ func SignatureToASN1(t KeyType, sig Signature) ([]byte, error) {
 // SignatureToTyped decorates a Signature into a TypedSignature.
 func SignatureToTyped(t KeyType, sig Signature) (TypedSignature, error) {
 	if !t.Available() {
-		return nil, ErrKeyTypeNotSupported
+		return nil, ErrUnsupportedKeyType
 	}
 	return crpts[t].SignatureToTyped(sig)
 }
@@ -398,7 +432,7 @@ func SignatureToTyped(t KeyType, sig Signature) (TypedSignature, error) {
 // GenerateKey generates a public/private key pair using entropy from rand.
 func GenerateKey(t KeyType, rand io.Reader) (PublicKey, PrivateKey, error) {
 	if !t.Available() {
-		return nil, nil, ErrKeyTypeNotSupported
+		return nil, nil, ErrUnsupportedKeyType
 	}
 	return crpts[t].GenerateKey(rand)
 }
@@ -407,7 +441,7 @@ func GenerateKey(t KeyType, rand io.Reader) (PublicKey, PrivateKey, error) {
 // Returns ErrUnimplemented if batch verification is not supported for this key type.
 func NewBatchVerifier(t KeyType, opts crypto.SignerOpts) (BatchVerifier, error) {
 	if !t.Available() {
-		return nil, ErrKeyTypeNotSupported
+		return nil, ErrUnsupportedKeyType
 	}
 	return crpts[t].NewBatchVerifier(opts)
 }
