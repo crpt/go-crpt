@@ -21,11 +21,11 @@ func New(keyType crpt.KeyType, opts crypto.SignerOpts) (crpt.Crpt, error) {
 	case crpt.SM2:
 		return sm2.NewWithCryptoSignerOpts(opts)
 	default:
-		return nil, crpt.ErrKeyTypeNotSupported
+		return nil, crpt.ErrUnsupportedKeyType
 	}
 }
 
-// MustNew creates a Crpt instance with the specified algorithm and default signer options,
+// MustNew creates a Crpt instance with the specified KeyType and default signer options,
 // it panics if an error occurs.
 func MustNew(keyType crpt.KeyType, opts crypto.SignerOpts) crpt.Crpt {
 	var crypt crpt.Crpt
@@ -36,10 +36,21 @@ func MustNew(keyType crpt.KeyType, opts crypto.SignerOpts) crpt.Crpt {
 	case crpt.SM2:
 		crypt, err = sm2.NewWithCryptoSignerOpts(opts)
 	default:
-		panic(crpt.ErrKeyTypeNotSupported)
+		panic(crpt.ErrUnsupportedKeyType)
 	}
 	if err != nil {
 		panic(err)
 	}
 	return crypt
+}
+
+// NewWithKeyTypeStr creates a Crpt instance with the specified KeyType string and default signer options.
+func NewWithKeyTypeStr(keyTypeStr string, opts crypto.SignerOpts) (crpt.Crpt, error) {
+	return New(crpt.KeyTypeFromStr(keyTypeStr), opts)
+}
+
+// MustNewWithKeyTypeStr creates a Crpt instance with the specified KeyType string and default signer options,
+// it panics if an error occurs.
+func MustNewWithKeyTypeStr(keyTypeStr string, opts crypto.SignerOpts) crpt.Crpt {
+	return MustNew(crpt.KeyTypeFromStr(keyTypeStr), opts)
 }
