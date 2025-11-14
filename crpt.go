@@ -458,6 +458,39 @@ func VerifyDigest(pub PublicKey, digest []byte, sig Signature, opts crypto.Signe
 	return pub.VerifyDigest(digest, sig, opts)
 }
 
+// SignerOptsWithHash is an interface that combines crypto.SignerOpts with SetHash and Clone methods
+type SignerOptsWithHash interface {
+	crypto.SignerOpts
+	Clone() SignerOptsWithHash
+	SetHash(crypto.Hash)
+}
+
+// ConvertSignerOpts converts crypto.SignerOpts to a specific SignerOpts type using generics.
+//
+// T must be a pointer type that implements SignerOptsWithHash.
+// The behavior is:
+// - If opts is nil, returns defaultOpts (as-is, even if nil)
+// - If opts is of type T, returns opts (caller should not modify the returned value)
+// - If opts is not of type T, creates a copy of defaultOpts, extracts HashFunc(), modifies the copy, and returns it
+func ConvertSignerOpts[T SignerOptsWithHash](opts crypto.SignerOpts, defaultOpts T) T {
+	// Create a dopt to avoid modifying the original defaultOpts
+	dopt := defaultOpts.Clone().(T)
+
+	if opts == nil {
+		return dopt
+	}
+
+	// Try to convert to the target type
+	if typed, ok := opts.(T); ok {
+		return typed
+	}
+
+	// For type other than T, only use the hash function (including NotHashed which is 0)
+	dopt.SetHash(opts.HashFunc())
+
+	return dopt
+}
+
 /* Batch */
 
 // BatchVerifier provides batch signature verification.
