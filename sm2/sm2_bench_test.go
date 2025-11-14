@@ -59,8 +59,9 @@ func BenchmarkSignDigest(b *testing.B) {
 
 	b.ReportAllocs()
 	b.ResetTimer()
+	opts := NewSignerOpts(false, nil, crypto.SHA256)
 	for i := 0; i < b.N; i++ {
-		if _, err := priv.SignDigest(digest, rand.Reader, crypto.SHA256); err != nil {
+		if _, err := priv.SignDigest(digest, rand.Reader, opts); err != nil {
 			b.Fatal(err)
 		}
 	}

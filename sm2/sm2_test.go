@@ -22,6 +22,11 @@ var testSM2PrivateKey = []byte{
 	0x94, 0x4e, 0x28, 0x4d, 0xbd, 0x96, 0x90, 0x93,
 }
 
+var (
+	digestSHA256Opts = NewSignerOpts(false, nil, crypto.SHA256)
+	digestSHA512Opts = NewSignerOpts(false, nil, crypto.SHA512)
+)
+
 func TestSM2Crpt(t *testing.T) {
 	req := require.New(t)
 	assr := assert.New(t)
@@ -78,7 +83,7 @@ func TestSM2_ErrorCases(t *testing.T) {
 		require.NoError(t, err)
 
 		digest := make([]byte, 32)
-		ok, err := pub.VerifyDigest(digest, []byte{0x30}, crypto.SHA256)
+		ok, err := pub.VerifyDigest(digest, []byte{0x30}, digestSHA256Opts)
 		require.NoError(t, err)
 		require.False(t, ok)
 	})
@@ -132,10 +137,7 @@ func TestSM2_SignatureConversions(t *testing.T) {
 }
 
 func TestSM2_CustomHashAndUID(t *testing.T) {
-	opts := &SignerOpts{
-		Hash: crypto.SHA512,
-		UID:  []byte("custom-agent"),
-	}
+	opts := NewSignerOpts(true, []byte("custom-agent"), crypto.SHA512)
 	c, err := New(opts)
 	require.NoError(t, err)
 	require.Equal(t, crypto.SHA512, c.HashFunc())
@@ -152,16 +154,16 @@ func TestSM2_CustomHashAndUID(t *testing.T) {
 	require.True(t, ok)
 
 	digest := c.Hash(message)
-	digestSig, err := priv.SignDigest(digest, rand.Reader, crypto.SHA512)
+	digestSig, err := priv.SignDigest(digest, rand.Reader, digestSHA512Opts)
 	require.NoError(t, err)
 
-	ok, err = pub.VerifyDigest(digest, digestSig, crypto.SHA512)
+	ok, err = pub.VerifyDigest(digest, digestSig, digestSHA512Opts)
 	require.NoError(t, err)
 	require.True(t, ok)
 
 	wrongDigest := append([]byte{}, digest...)
 	wrongDigest[0] ^= 0xFF
-	ok, err = pub.VerifyDigest(wrongDigest, digestSig, crypto.SHA512)
+	ok, err = pub.VerifyDigest(wrongDigest, digestSig, digestSHA512Opts)
 	require.NoError(t, err)
 	require.False(t, ok)
 }
@@ -260,7 +262,7 @@ func testSM2FromBytesSignVerify(t *testing.T, c crpt.Crpt, privateKey []byte) {
 	assr.NotZero(len(sig2))
 
 	digest := c.Hash(message)
-	sigDigest, err := priv.SignDigest(digest, rand.Reader, crypto.SHA256)
+	sigDigest, err := priv.SignDigest(digest, rand.Reader, digestSHA256Opts)
 	req.NoError(err)
 
 	pub := priv.Public()
@@ -273,11 +275,11 @@ func testSM2FromBytesSignVerify(t *testing.T, c crpt.Crpt, privateKey []byte) {
 	req.NoError(err)
 	assr.False(ok)
 
-	ok, err = pub.VerifyDigest(digest, sigDigest, crypto.SHA256)
+	ok, err = pub.VerifyDigest(digest, sigDigest, digestSHA256Opts)
 	req.NoError(err)
 	assr.True(ok)
 
-	ok, err = pub.VerifyDigest(digest, sig2, crypto.SHA256)
+	ok, err = pub.VerifyDigest(digest, sig2, digestSHA256Opts)
 	req.NoError(err)
 	assr.False(ok)
 
