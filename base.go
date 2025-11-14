@@ -14,8 +14,8 @@ import (
 )
 
 type BaseKey struct {
-	Type KeyType
-	Sops crypto.SignerOpts
+	Type  KeyType
+	Sopts crypto.SignerOpts
 }
 
 // KeyType returns the key type.
@@ -25,7 +25,7 @@ func (k BaseKey) KeyType() KeyType {
 
 // SignerOpts reports the default SignerOpts use by this key.
 func (k BaseKey) SignerOpts() crypto.SignerOpts {
-	return k.Sops
+	return k.Sopts
 }
 
 // BasePublicKey is a helper struct meant to be anonymously embedded by pointer in all
@@ -87,8 +87,8 @@ type BaseCrpt struct {
 	// KeyType used for embedding crpt.Crpt instance
 	keyType KeyType
 
-	// sops holds the default signer options to be used for Crpt.Hash and other operations.
-	sops crypto.SignerOpts
+	// sopts holds the default signer options to be used for Crpt.Hash and other operations.
+	sopts crypto.SignerOpts
 
 	// hashFuncByte := byte(defaultSignerOpts.HashFunc())
 	hashFuncByte byte
@@ -117,17 +117,17 @@ func NewBaseCrpt(t KeyType, opts crypto.SignerOpts, parent Crpt) (*BaseCrpt, err
 	}
 	return &BaseCrpt{
 		keyType:      t,
-		sops:         opts,
+		sopts:        opts,
 		hashFuncByte: byte(hashFunc),
 		parent:       parent,
 	}, nil
 }
 
 func (c *BaseCrpt) checkHashFunc() crypto.Hash {
-	if c.sops == nil || !c.sops.HashFunc().Available() {
+	if c.sopts == nil || !c.sopts.HashFunc().Available() {
 		panic("crpt: hash function is not set")
 	}
-	return c.sops.HashFunc()
+	return c.sopts.HashFunc()
 }
 
 // KeyType implements crpt.KeyType.
@@ -137,15 +137,15 @@ func (c *BaseCrpt) KeyType() KeyType {
 
 // HashFunc implements crpt.SignerOpts.
 func (c *BaseCrpt) SignerOpts() crypto.SignerOpts {
-	return c.sops
+	return c.sopts
 }
 
 // HashFunc implements crpt.HashFunc.
 func (c *BaseCrpt) HashFunc() crypto.Hash {
-	if c.sops == nil {
+	if c.sopts == nil {
 		return 0
 	}
-	return c.sops.HashFunc()
+	return c.sopts.HashFunc()
 }
 
 // Hash implements Crpt.Hash using BaseCrpt.defaultSignerOpts.
