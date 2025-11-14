@@ -24,8 +24,17 @@ import (
 
 // SignerOpts controls how SM2 operations are performed.
 type SignerOpts struct {
-	Hash crypto.Hash
-	UID  []byte
+	*gsm2.SM2SignerOption
+	hash crypto.Hash
+	uid  []byte
+}
+
+func NewSignerOpts(forceGMSign bool, uid []byte, hash crypto.Hash) *SignerOpts {
+	return &SignerOpts{
+		SM2SignerOption: gsm2.NewSM2SignerOption(forceGMSign, uid),
+		hash:            hash,
+		uid:             uid,
+	}
 }
 
 // Type check
@@ -47,10 +56,9 @@ var (
 	ErrWrongPublicKeySize  = fmt.Errorf("%w, should be %d bytes", crpt.ErrWrongPublicKeySize, PublicKeySize)
 	ErrWrongPrivateKeySize = fmt.Errorf("%w, should be %d bytes", crpt.ErrWrongPrivateKeySize, PrivateKeySize)
 	ErrInvalidSignature    = errors.New("sm2: invalid signature encoding")
+	ErrInvalidSignerOpts   = errors.New("sm2: signer opts must be *sm2.SignerOpts")
 
-	DefaultSignerOpts = &SignerOpts{ // Default hash drives BaseCrpt hash helpers.
-		Hash: crypto.SHA256,
-	}
+	DefaultSignerOpts = NewSignerOpts(true, nil, crypto.SHA256) // Default hash drives BaseCrpt hash helpers.
 )
 
 // Address matches the global crpt.Address alias for clarity.
@@ -63,42 +71,25 @@ func init() {
 
 // HashFunc implements crypto.SignerOpts.
 func (o *SignerOpts) HashFunc() crypto.Hash {
-	if o == nil || o.Hash == 0 {
-		return crypto.SHA256
+	if o == nil {
+		return crpt.NotHashed
 	}
-	return o.Hash
+	return o.hash
 }
 
 // ConvertSignerOpts normalizes crypto.SignerOpts into SignerOpts instances.
-func ConvertSignerOpts(opts crypto.SignerOpts, defaultOpts SignerOpts) *SignerOpts {
+func ConvertSignerOpts(opts crypto.SignerOpts, defaultOpts *SignerOpts) (*SignerOpts, error) {
+	if defaultOpts == nil {
+		defaultOpts = DefaultSignerOpts
+	}
 	if opts == nil {
-		return cloneSignerOpts(&defaultOpts)
+		return defaultOpts, nil
 	}
-	if so, ok := opts.(*SignerOpts); ok {
-		return cloneSignerOpts(so)
+	so, ok := opts.(*SignerOpts)
+	if !ok || so == nil {
+		return nil, ErrInvalidSignerOpts
 	}
-	defaultOpts.Hash = opts.HashFunc()
-	return cloneSignerOpts(&defaultOpts)
-}
-
-func cloneSignerOpts(opts *SignerOpts) *SignerOpts {
-	base := DefaultSignerOpts
-	if opts != nil {
-		base = opts
-	}
-	clone := *base
-	if len(clone.UID) > 0 {
-		clone.UID = append([]byte(nil), clone.UID...)
-	}
-	return &clone
-}
-
-func (o *SignerOpts) toGMSM(forceGMSign bool) *gsm2.SM2SignerOption {
-	var uid []byte
-	if o != nil && len(o.UID) > 0 {
-		uid = append([]byte(nil), o.UID...)
-	}
-	return gsm2.NewSM2SignerOption(forceGMSign, uid)
+	return so, nil
 }
 
 // PublicKey wraps an uncompressed SM2 public key.
@@ -117,9 +108,12 @@ func NewPublicKey(b []byte, opts crypto.SignerOpts) (*PublicKey, error) {
 		return nil, ErrWrongPublicKeySize
 	}
 	if opts == nil {
-		opts = cloneSignerOpts(nil)
+		return nil, errors.New("sm2: opts is nil")
 	}
-	sops := ConvertSignerOpts(opts, *DefaultSignerOpts)
+	sops, ok := opts.(*SignerOpts)
+	if !ok {
+		return nil, errors.New("sm2: opts is not of type *SignerOpts")
+	}
 	ecdsaPub, err := gsm2.NewPublicKey(b)
 	if err != nil {
 		return nil, err
@@ -173,8 +167,12 @@ func (pub PublicKey) VerifyMessage(message []byte, sig crpt.Signature, opts cryp
 	if message == nil {
 		message = []byte{}
 	}
-	sops := ConvertSignerOpts(opts, *pub.SignerOpts().(*SignerOpts))
-	digest, err := gsm2.CalculateSM2Hash(pub.ecdsaPub, message, sops.UID)
+	baseSops, _ := pub.SignerOpts().(*SignerOpts)
+	sops, err := ConvertSignerOpts(opts, baseSops)
+	if err != nil {
+		return false, err
+	}
+	digest, err := gsm2.CalculateSM2Hash(pub.ecdsaPub, message, sops.uid)
 	if err != nil {
 		return false, err
 	}
@@ -193,8 +191,12 @@ func (pub PublicKey) VerifyDigest(digest []byte, sig crpt.Signature, opts crypto
 		return false, err
 	}
 
-	sops := ConvertSignerOpts(opts, *pub.SignerOpts().(*SignerOpts))
-	if !sops.Hash.Available() {
+	baseSops, _ := pub.SignerOpts().(*SignerOpts)
+	sops, err := ConvertSignerOpts(opts, baseSops)
+	if err != nil {
+		return false, err
+	}
+	if !sops.hash.Available() {
 		return false, crpt.ErrInvalidHashFunc
 	}
 	return gsm2.VerifyASN1(pub.ecdsaPub, digest, sig), nil
@@ -214,7 +216,10 @@ func NewPrivateKey(b []byte, opts crypto.SignerOpts) (*PrivateKey, error) {
 	if len(b) != PrivateKeySize {
 		return nil, ErrWrongPrivateKeySize
 	}
-	sops := ConvertSignerOpts(opts, *DefaultSignerOpts)
+	sops, err := ConvertSignerOpts(opts, DefaultSignerOpts)
+	if err != nil {
+		return nil, err
+	}
 	priv, err := gsm2.NewPrivateKey(b)
 	if err != nil {
 		return nil, err
@@ -272,9 +277,16 @@ func (priv PrivateKey) SignMessage(message []byte, rand io.Reader, opts crypto.S
 	if rand == nil {
 		rand = crand.Reader
 	}
-	sops := ConvertSignerOpts(opts, *priv.SignerOpts().(*SignerOpts))
-	sops.Hash = crpt.NotHashed
-	sig, err := priv.priv.Sign(rand, message, sops.toGMSM(true))
+	baseSops, _ := priv.SignerOpts().(*SignerOpts)
+	sops, err := ConvertSignerOpts(opts, baseSops)
+	if err != nil {
+		return nil, err
+	}
+	gmOpts := sops.SM2SignerOption
+	if gmOpts == nil {
+		gmOpts = gsm2.NewSM2SignerOption(true, sops.uid)
+	}
+	sig, err := priv.priv.Sign(rand, message, gmOpts)
 	if err != nil {
 		return nil, err
 	}
@@ -289,11 +301,23 @@ func (priv PrivateKey) SignDigest(digest []byte, rand io.Reader, opts crypto.Sig
 	if rand == nil {
 		rand = crand.Reader
 	}
-	sops := ConvertSignerOpts(opts, *priv.SignerOpts().(*SignerOpts))
-	if !sops.Hash.Available() {
+	baseSops, _ := priv.SignerOpts().(*SignerOpts)
+	sops, err := ConvertSignerOpts(opts, baseSops)
+	if err != nil {
+		return nil, err
+	}
+	if !sops.hash.Available() {
 		return nil, crpt.ErrInvalidHashFunc
 	}
-	sig, err := priv.priv.Sign(rand, digest, sops.toGMSM(false))
+	var signerOpts crypto.SignerOpts
+	if _, ok := opts.(*SignerOpts); ok {
+		gmOpts := sops.SM2SignerOption
+		if gmOpts == nil {
+			gmOpts = gsm2.NewSM2SignerOption(false, sops.uid)
+		}
+		signerOpts = gmOpts
+	}
+	sig, err := priv.priv.Sign(rand, digest, signerOpts)
 	if err != nil {
 		return nil, err
 	}
@@ -310,9 +334,11 @@ var _ crpt.Crpt = (*sm2Crpt)(nil)
 
 // New creates an SM2 Crpt with the provided default signer options.
 func New(opts *SignerOpts) (*sm2Crpt, error) {
-	sops := cloneSignerOpts(opts)
+	if opts == nil {
+		opts = DefaultSignerOpts
+	}
 	crypt := &sm2Crpt{}
-	base, err := crpt.NewBaseCrpt(KeyType, sops, crypt)
+	base, err := crpt.NewBaseCrpt(KeyType, opts, crypt)
 	if err != nil {
 		return nil, err
 	}
@@ -322,7 +348,10 @@ func New(opts *SignerOpts) (*sm2Crpt, error) {
 
 // NewWithCryptoSignerOpts creates an SM2 Crpt from generic crypto.SignerOpts.
 func NewWithCryptoSignerOpts(opts crypto.SignerOpts) (*sm2Crpt, error) {
-	sops := ConvertSignerOpts(opts, *DefaultSignerOpts)
+	sops, err := ConvertSignerOpts(opts, DefaultSignerOpts)
+	if err != nil {
+		return nil, err
+	}
 	return New(sops)
 }
 
