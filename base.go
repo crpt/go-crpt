@@ -15,7 +15,7 @@ import (
 
 type BaseKey struct {
 	Type  KeyType
-	Sopts crypto.SignerOpts
+	Sopts SignerOpts
 }
 
 // KeyType returns the key type.
@@ -24,7 +24,7 @@ func (k BaseKey) KeyType() KeyType {
 }
 
 // SignerOpts reports the default SignerOpts use by this key.
-func (k BaseKey) SignerOpts() crypto.SignerOpts {
+func (k BaseKey) SignerOpts() SignerOpts {
 	return k.Sopts
 }
 
@@ -42,8 +42,8 @@ func (pub BasePublicKey) ToTyped() Typed[PublicKey] {
 }
 
 // Verify reports whether `sig` is a valid signature of message or digest by the public key.
-func (pub BasePublicKey) Verify(message, digest []byte, sig Signature, opts crypto.SignerOpts) (bool, error) {
-	if digest != nil && opts != nil && opts.HashFunc().Available() {
+func (pub BasePublicKey) Verify(message, digest []byte, sig Signature, opts SignerOpts) (bool, error) {
+	if digest != nil && opts != nil && opts.HashFunc() != NotHashed {
 		return pub.Parent.VerifyDigest(digest, sig, opts)
 	} else if message != nil {
 		return pub.Parent.VerifyMessage(message, sig, opts)
@@ -66,7 +66,7 @@ func (priv BasePrivateKey) ToTyped() Typed[PrivateKey] {
 }
 
 // Sign produces a signature on the provided message.
-func (priv BasePrivateKey) Sign(message, digest []byte, rand io.Reader, opts crypto.SignerOpts,
+func (priv BasePrivateKey) Sign(message, digest []byte, rand io.Reader, opts SignerOpts,
 ) (Signature, error) {
 	if len(digest) > 0 {
 		if !(opts != nil && opts.HashFunc().Available()) {
@@ -88,7 +88,7 @@ type BaseCrpt struct {
 	keyType KeyType
 
 	// sopts holds the default signer options to be used for Crpt.Hash and other operations.
-	sopts crypto.SignerOpts
+	sopts SignerOpts
 
 	// hashFuncByte := byte(defaultSignerOpts.HashFunc())
 	hashFuncByte byte
@@ -104,8 +104,8 @@ var ErrParentIsNil = errors.New("implementations should always pass parent Crpt"
 // t: KeyType used for embedding crpt.Crpt instance
 // opts: holds the default signer options to be used for Crpt.Hash and other operations.
 // parent: the concrete crpt.Crpt instance which is embedding this BaseCrpt instance.
-func NewBaseCrpt(t KeyType, opts crypto.SignerOpts, parent Crpt) (*BaseCrpt, error) {
-	var hashFunc crypto.Hash
+func NewBaseCrpt(t KeyType, opts SignerOpts, parent Crpt) (*BaseCrpt, error) {
+	var hashFunc Hash
 	if opts != nil {
 		hashFunc = opts.HashFunc()
 		if hashFunc != 0 && !hashFunc.Available() {
@@ -123,7 +123,7 @@ func NewBaseCrpt(t KeyType, opts crypto.SignerOpts, parent Crpt) (*BaseCrpt, err
 	}, nil
 }
 
-func (c *BaseCrpt) checkHashFunc() crypto.Hash {
+func (c *BaseCrpt) checkHashFunc() Hash {
 	if c.sopts == nil || !c.sopts.HashFunc().Available() {
 		panic("crpt: hash function is not set")
 	}
@@ -136,12 +136,12 @@ func (c *BaseCrpt) KeyType() KeyType {
 }
 
 // HashFunc implements crpt.SignerOpts.
-func (c *BaseCrpt) SignerOpts() crypto.SignerOpts {
+func (c *BaseCrpt) SignerOpts() SignerOpts {
 	return c.sopts
 }
 
 // HashFunc implements crpt.HashFunc.
-func (c *BaseCrpt) HashFunc() crypto.Hash {
+func (c *BaseCrpt) HashFunc() Hash {
 	if c.sopts == nil {
 		return 0
 	}
@@ -149,14 +149,14 @@ func (c *BaseCrpt) HashFunc() crypto.Hash {
 }
 
 // Hash implements Crpt.Hash using BaseCrpt.defaultSignerOpts.
-func (c *BaseCrpt) Hash(b []byte) Hash {
+func (c *BaseCrpt) Hash(b []byte) HashValue {
 	h := c.checkHashFunc().HashFunc().New()
 	h.Write(b)
 	return h.Sum(nil)
 }
 
 // HashTyped implements Crpt.HashTyped using BaseCrpt.defaultSignerOpts.
-func (c *BaseCrpt) HashTyped(b []byte) TypedHash {
+func (c *BaseCrpt) HashTyped(b []byte) TypedHashValue {
 	h := c.checkHashFunc().New()
 	h.Write(b)
 	s := h.Sum(nil)
@@ -171,8 +171,8 @@ func (c *BaseCrpt) SumHashTyped(h hash.Hash, b []byte) []byte {
 	return s
 }
 
-// HashToTyped decorates a hash into a TypedHash.
-func (c *BaseCrpt) HashToTyped(h Hash) TypedHash {
+// HashValueToTyped decorates a hash into a TypedHash.
+func (c *BaseCrpt) HashValueToTyped(h HashValue) TypedHashValue {
 	ht := make([]byte, len(h))
 	ht[0] = c.hashFuncByte
 	copy(ht[1:], h[1:])
@@ -182,13 +182,13 @@ func (c *BaseCrpt) HashToTyped(h Hash) TypedHash {
 // Sign implements Crpt.MerkleHashFromByteSlices using `crpt/go-merkle`.
 func (c *BaseCrpt) MerkleHashFromByteSlices(items [][]byte) (rootHash []byte) {
 	h := c.checkHashFunc()
-	return merkle.HashFromByteSlicesIterative(h, items)
+	return merkle.HashFromByteSlicesIterative(crypto.Hash(h), items)
 }
 
 // Sign implements Crpt.MerkleHashTypedFromByteSlices using `crpt/go-merkle`.
-func (c *BaseCrpt) MerkleHashTypedFromByteSlices(items [][]byte) (rootHash TypedHash) {
+func (c *BaseCrpt) MerkleHashTypedFromByteSlices(items [][]byte) (rootHash TypedHashValue) {
 	h := c.checkHashFunc()
-	rootHash = merkle.HashFromByteSlicesIterative(h, items)
+	rootHash = merkle.HashFromByteSlicesIterative(crypto.Hash(h), items)
 	rootHash[0] = byte(h)
 	return rootHash
 }
@@ -197,14 +197,14 @@ func (c *BaseCrpt) MerkleHashTypedFromByteSlices(items [][]byte) (rootHash Typed
 func (c *BaseCrpt) MerkleProofsFromByteSlices(items [][]byte,
 ) (rootHash []byte, proofs []*merkle.Proof) {
 	h := c.checkHashFunc()
-	return merkle.ProofsFromByteSlices(h, items)
+	return merkle.ProofsFromByteSlices(crypto.Hash(h), items)
 }
 
 // Sign implements Crpt.MerkleProofsTypedFromByteSlices using `crpt/go-merkle`.
 func (c *BaseCrpt) MerkleProofsTypedFromByteSlices(items [][]byte,
-) (rootHash TypedHash, proofs []*merkle.Proof) {
+) (rootHash TypedHashValue, proofs []*merkle.Proof) {
 	h := c.checkHashFunc()
-	rootHash, proofs = merkle.ProofsFromByteSlices(h, items)
+	rootHash, proofs = merkle.ProofsFromByteSlices(crypto.Hash(h), items)
 	rootHash[0] = byte(h)
 	return rootHash, proofs
 }

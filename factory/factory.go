@@ -6,15 +6,13 @@
 package factory
 
 import (
-	"crypto"
-
 	"github.com/crpt/go-crpt"
 	"github.com/crpt/go-crpt/ed25519"
 	"github.com/crpt/go-crpt/sm2"
 )
 
 // New creates a Crpt instance with the specified KeyType and default signer options.
-func New(keyType crpt.KeyType, opts crypto.SignerOpts) (crpt.Crpt, error) {
+func New(keyType crpt.KeyType, opts crpt.SignerOpts) (crpt.Crpt, error) {
 	switch keyType {
 	case crpt.Ed25519:
 		return ed25519.NewWithCryptoSignerOpts(opts)
@@ -27,7 +25,7 @@ func New(keyType crpt.KeyType, opts crypto.SignerOpts) (crpt.Crpt, error) {
 
 // MustNew creates a Crpt instance with the specified KeyType and default signer options,
 // it panics if an error occurs.
-func MustNew(keyType crpt.KeyType, opts crypto.SignerOpts) crpt.Crpt {
+func MustNew(keyType crpt.KeyType, opts crpt.SignerOpts) crpt.Crpt {
 	var crypt crpt.Crpt
 	var err error
 	switch keyType {
@@ -45,12 +43,12 @@ func MustNew(keyType crpt.KeyType, opts crypto.SignerOpts) crpt.Crpt {
 }
 
 // NewWithKeyTypeStr creates a Crpt instance with the specified KeyType string and default signer options.
-func NewWithKeyTypeStr(keyTypeStr string, opts crypto.SignerOpts) (crpt.Crpt, error) {
+func NewWithKeyTypeStr(keyTypeStr string, opts crpt.SignerOpts) (crpt.Crpt, error) {
 	return New(crpt.KeyTypeFromStr(keyTypeStr), opts)
 }
 
 // MustNewWithKeyTypeStr creates a Crpt instance with the specified KeyType string and default signer options,
 // it panics if an error occurs.
-func MustNewWithKeyTypeStr(keyTypeStr string, opts crypto.SignerOpts) crpt.Crpt {
+func MustNewWithKeyTypeStr(keyTypeStr string, opts crpt.SignerOpts) crpt.Crpt {
 	return MustNew(crpt.KeyTypeFromStr(keyTypeStr), opts)
 }

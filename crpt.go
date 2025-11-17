@@ -6,7 +6,6 @@
 package crpt
 
 import (
-	"crypto"
 	"crypto/subtle"
 	"errors"
 	"hash"
@@ -65,20 +64,25 @@ func (t KeyType) Available() bool {
 	return t < MaxCrpt && crpts[t] != nil
 }
 
-// Passing NotHashed as hashFunc to Crpt.Sign indicates that message is not hashed
-const NotHashed crypto.Hash = 0
-
 var (
-	ErrUnsupportedKeyType   = errors.New("unsupported key type")
-	ErrUnimplemented        = errors.New("not implemented")
-	ErrWrongPublicKeySize   = errors.New("wrong public key size")
-	ErrWrongPrivateKeySize  = errors.New("wrong private key size")
-	ErrWrongSignatureSize   = errors.New("wrong signature size")
-	ErrEmptyMessage         = errors.New("message is empty")
-	ErrInvalidHashFunc      = errors.New("invalid hash function")
-	ErrNoMatchingCryptoHash = errors.New("no matching crypto.Hash exists")
+	ErrUnsupportedKeyType  = errors.New("unsupported key type")
+	ErrUnimplemented       = errors.New("not implemented")
+	ErrWrongPublicKeySize  = errors.New("wrong public key size")
+	ErrWrongPrivateKeySize = errors.New("wrong private key size")
+	ErrWrongSignatureSize  = errors.New("wrong signature size")
+	ErrEmptyMessage        = errors.New("message is empty")
+	ErrInvalidHashFunc     = errors.New("invalid hash function")
+	ErrNoMatchingHash      = errors.New("no matching crpt.Hash exists")
 	// ErrNoMatchingMultihash  = errors.New("no matching multihash exists")
 )
+
+// SignerOpts contains options for signing.
+type SignerOpts interface {
+	// HashFunc returns an identifier for the hash function used to produce
+	// the message passed to Sign[Xxx] functions, or else NotHashed (zero) to indicate that no
+	// hashing was done.
+	HashFunc() Hash
+}
 
 // Untyped is the minimal common interface for the following crpt objects: PublicKey, PrivateKey, Signature
 type Untyped[T any] interface {
@@ -141,7 +145,7 @@ type UntypedKey[T any] interface {
 	//
 	// PublicKey/PrivateKey implementations generally don't need to implement this method as it is
 	// already implemented by embedded BasePublicKey/BasePrivateKey.
-	SignerOpts() crypto.SignerOpts
+	SignerOpts() SignerOpts
 
 	// ToTyped returns the typed bytes representation of the key.
 	//
@@ -162,27 +166,25 @@ type PublicKey interface {
 
 	// Verify reports whether `sig` is a valid signature of message or digest by the public key.
 	//
-	// In most case, it is recommended to use Verify instead of VerifyMessage or VerifyDigest.
-	//
 	// If digest is provided (not empty), and the Crpt implementation is appropriate for signing the
 	// pre-hashed messages (see SignMessage for details), Verify should try VerifyDigest first, then
 	// it should try VerifyMessage, it should returns true if either returns true.
 	//
 	// Crpt implementations generally don't need to implement this method as it is
 	// already implemented by embedded BaseCrpt.
-	Verify(message, digest []byte, sig Signature, opts crypto.SignerOpts) (bool, error)
+	Verify(message, digest []byte, sig Signature, opts SignerOpts) (bool, error)
 
 	// VerifyMessage reports whether `sig` is a valid signature of message by the public key.
-	VerifyMessage(message []byte, sig Signature, opts crypto.SignerOpts) (bool, error)
+	VerifyMessage(message []byte, sig Signature, opts SignerOpts) (bool, error)
 
 	// VerifyDigest reports whether `sig` is a valid signature of digest by the public key.
 	//
-	// The caller must hash the message and pass the hash (as digest) and the appropriate crypto.SignerOpts
+	// The caller must hash the message and pass the hash (as digest) and the appropriate SignerOpts
 	// so opts.HashFunc() returns the function used to SignDigest.
 	//
 	// Some Crpt implementations are not appropriate for signing the pre-hashed messages, which will
 	// return ErrUnimplemented.
-	VerifyDigest(digest []byte, sig Signature, opts crypto.SignerOpts) (bool, error)
+	VerifyDigest(digest []byte, sig Signature, opts SignerOpts) (bool, error)
 }
 
 // PrivateKey represents a private key with a specific key type.
@@ -197,8 +199,7 @@ type PrivateKey interface {
 
 	// Sign signs message or digest and returns a Signature, possibly using entropy from rand.
 	//
-	// In most case, it is recommended to use Sign instead of SignMessage or SignDigest. If not
-	// providing digest (nil or empty), the caller can pass NotHashed as the value for hashFunc.
+	// If not providing digest (nil or empty), the caller can pass NotHashed as the value for hashFunc.
 	//
 	// If digest is provided (not empty), and the Crpt implementation is appropriate
 	// for signing the pre-hashed messages (see SignMessage for details), Sign should
@@ -206,11 +207,11 @@ type PrivateKey interface {
 	//
 	// PrivateKey implementations generally don't need to implement this method as it is
 	// already implemented by embedded BasePrivateKey.
-	Sign(message, digest []byte, rand io.Reader, opts crypto.SignerOpts) (Signature, error)
+	Sign(message, digest []byte, rand io.Reader, opts SignerOpts) (Signature, error)
 
 	// SignMessage directly signs message with `priv`, possibly using entropy from rand.
-	// Implementations should always use crpt.NotHashed and ignore opts.HashFunc().
-	SignMessage(message []byte, rand io.Reader, opts crypto.SignerOpts) (Signature, error)
+	// Implementations should always use NotHashed and ignore opts.HashFunc().
+	SignMessage(message []byte, rand io.Reader, opts SignerOpts) (Signature, error)
 
 	// SignDigest signs digest with `priv` and returns a Signature, possibly using entropy from rand.
 	//
@@ -219,7 +220,7 @@ type PrivateKey interface {
 	//
 	// Some Crpt implementations are not appropriate for signing the pre-hashed messages, which will
 	// return ErrUnimplemented.
-	SignDigest(digest []byte, rand io.Reader, opts crypto.SignerOpts) (Signature, error)
+	SignDigest(digest []byte, rand io.Reader, opts SignerOpts) (Signature, error)
 }
 
 // Signature represents a digital signature produced by signing a message.
@@ -245,20 +246,13 @@ func (sig Signature) Bytes() []byte {
 	return sig
 }
 
-// TypedSignature consists of 1-byte representation of crypto.Hash used as uint8 concatenated with
+// TypedSignature consists of 1-byte representation of crpt.Hash used as uint8 concatenated with
 // the signature's bytes representation.
 type TypedSignature []byte
 
 // Address represents an address derived from a PublicKey.
 // An address is a []byte, but hex-encoded even in JSON.
 type Address = gbytes.HexBytes
-
-// Hash represents a hash.
-type Hash []byte
-
-// TypedHash is a hash representation that replace the first byte with uint8 representation of the
-// crypto.Hash used.
-type TypedHash []byte
 
 // Crpt is the common crypto operations interface implemented by all crypto implementations.
 type Crpt interface {
@@ -272,34 +266,34 @@ type Crpt interface {
 	//
 	// Crpt implementations generally don't need to implement this method as it is
 	// already implemented by embedded BaseCrpt.
-	SignerOpts() crypto.SignerOpts
+	SignerOpts() SignerOpts
 
 	// HashFunc reports the hash function to be used for Crpt.Hash.
 	//
 	// Crpt implementations generally don't need to implement this method as it is
 	// already implemented by embedded BaseCrpt.
-	HashFunc() crypto.Hash
+	HashFunc() Hash
 
 	// Hash calculates the hash of msg using underlying BaseCrpt.hashFunc.
 	//
 	// Crpt implementations generally don't need to implement this method as it is
 	// already implemented by embedded BaseCrpt.
-	Hash(msg []byte) Hash
+	Hash(msg []byte) HashValue
 
 	// HashTyped calculates the hash of msg using underlying BaseCrpt.hashFunc
 	// and return its TypedHash bytes representation.
 	//
 	// Crpt implementations generally don't need to implement this method as it is
 	// already implemented by embedded BaseCrpt.
-	HashTyped(msg []byte) TypedHash
+	HashTyped(msg []byte) TypedHashValue
 
-	// SumHashTyped appends the current hash of `h` in TypeHash bytes
+	// SumHashTyped appends the current hash of `h` in TypeedHashValue bytes
 	// representation to`b` and returns the resulting/slice.
 	// It does not change the underlying hash state.
 	SumHashTyped(h hash.Hash, b []byte) []byte
 
-	// HashToTyped decorates a hash into a TypedHash.
-	HashToTyped(Hash) TypedHash
+	// HashValueToTyped decorates a hash into a TypedHashValue.
+	HashValueToTyped(HashValue) TypedHashValue
 
 	// PublicKeyFromBytes constructs a PublicKey from raw bytes.
 	PublicKeyFromBytes(pub []byte) (PublicKey, error)
@@ -318,7 +312,7 @@ type Crpt interface {
 
 	// NewBatchVerifier creates a new batch verifier for this key type with the given options.
 	// Returns ErrUnimplemented if batch verification is not supported for this key type.
-	NewBatchVerifier(opts crypto.SignerOpts) (BatchVerifier, error)
+	NewBatchVerifier(opts SignerOpts) (BatchVerifier, error)
 
 	// MerkleHashFromByteSlices computes a Merkle tree where the leaves are the byte slice,
 	// in the provided order. It follows RFC-6962.
@@ -327,7 +321,7 @@ type Crpt interface {
 	// MerkleHashTypedFromByteSlices computes a Merkle tree where the leaves are the byte slice,
 	// in the provided order. It follows RFC-6962.
 	// This returns the TypedHash bytes representation.
-	MerkleHashTypedFromByteSlices(items [][]byte) (rootHash TypedHash)
+	MerkleHashTypedFromByteSlices(items [][]byte) (rootHash TypedHashValue)
 
 	// MerkleProofsFromByteSlices computes inclusion proof for given items.
 	// proofs[0] is the proof for items[0].
@@ -336,7 +330,7 @@ type Crpt interface {
 	// MerkleProofsTypedFromByteSlices computes inclusion proof for given items.
 	// proofs[0] is the proof for items[0].
 	// This returns the TypedHash bytes representation.
-	MerkleProofsTypedFromByteSlices(items [][]byte) (rootHash TypedHash, proofs []*merkle.Proof)
+	MerkleProofsTypedFromByteSlices(items [][]byte) (rootHash TypedHashValue, proofs []*merkle.Proof)
 }
 
 var crpts = make([]Crpt, MaxCrpt)
@@ -353,28 +347,28 @@ func RegisterCrpt(t KeyType, c Crpt) {
 
 // Equal reports whether this hash is equal to another hash.
 // Runs in constant time based on length of the keys to prevent time attacks.
-func (h TypedHash) Equal(o TypedHash) bool {
+func (h TypedHashValue) Equal(o TypedHashValue) bool {
 	if len(h) != len(o) {
 		return false
 	}
 	return subtle.ConstantTimeCompare(h, o) == 1
 }
 
-// HashToTyped decorates a hash into a TypedHash with crypto.Hash.
-func HashToTyped(hashFunc crypto.Hash, h Hash) TypedHash {
+// HashValueToTyped decorates a hash into a TypedHash with crpt.Hash.
+func HashValueToTyped(hashFunc Hash, h HashValue) TypedHashValue {
 	ht := make([]byte, len(h))
 	ht[0] = byte(hashFunc)
 	return ht
 }
 
 // TypedHashFromMultihash turns a Multihash into a TypedHash.
-func TypedHashFromMultihash(mh multihash.Multihash) (TypedHash, error) {
+func TypedHashFromMultihash(mh multihash.Multihash) (TypedHashValue, error) {
 	decoded, err := multihash.Decode(mh)
 	if err != nil {
 		return nil, err
 	}
 	if h, ok := MulticodecToCryptoHash[decoded.Code]; !ok {
-		return nil, ErrNoMatchingCryptoHash
+		return nil, ErrNoMatchingHash
 	} else {
 		decoded.Digest[0] = byte(h)
 		return decoded.Digest, nil
@@ -439,7 +433,7 @@ func GenerateKey(t KeyType, rand io.Reader) (PublicKey, PrivateKey, error) {
 
 // NewBatchVerifier creates a new batch verifier for this key type with the given options.
 // Returns ErrUnimplemented if batch verification is not supported for this key type.
-func NewBatchVerifier(t KeyType, opts crypto.SignerOpts) (BatchVerifier, error) {
+func NewBatchVerifier(t KeyType, opts SignerOpts) (BatchVerifier, error) {
 	if !t.Available() {
 		return nil, ErrUnsupportedKeyType
 	}
@@ -449,16 +443,16 @@ func NewBatchVerifier(t KeyType, opts crypto.SignerOpts) (BatchVerifier, error) 
 // Sign signs message or digest and returns a Signature, possibly using entropy from rand.
 //
 // See PrivateKey.Sign for more details.
-func Sign(priv PrivateKey, message, digest []byte, rand io.Reader, opts crypto.SignerOpts,
+func Sign(priv PrivateKey, message, digest []byte, rand io.Reader, opts SignerOpts,
 ) (Signature, error) {
 	return priv.Sign(message, digest, rand, opts)
 }
 
 // SignMessage directly signs message with `priv`, possibly using entropy from rand.
-// Implementations should always use crpt.NotHashed and ignore opts.HashFunc().
+// Implementations should always use NotHashed and ignore opts.HashFunc().
 //
 // See PrivateKey.SignMessage for more details.
-func SignMessage(priv PrivateKey, message []byte, rand io.Reader, opts crypto.SignerOpts,
+func SignMessage(priv PrivateKey, message []byte, rand io.Reader, opts SignerOpts,
 ) (Signature, error) {
 	return priv.SignMessage(message, rand, opts)
 }
@@ -466,7 +460,7 @@ func SignMessage(priv PrivateKey, message []byte, rand io.Reader, opts crypto.Si
 // SignDigest signs digest with `priv` and returns a Signature, possibly using entropy from rand.
 //
 // See PrivateKey.SignDigest for more details.
-func SignDigest(priv PrivateKey, digest []byte, rand io.Reader, opts crypto.SignerOpts,
+func SignDigest(priv PrivateKey, digest []byte, rand io.Reader, opts SignerOpts,
 ) (Signature, error) {
 	return priv.SignDigest(digest, rand, opts)
 }
@@ -474,39 +468,39 @@ func SignDigest(priv PrivateKey, digest []byte, rand io.Reader, opts crypto.Sign
 // Verify reports whether `sig` is a valid signature of message or digest by `pub`.
 //
 // See PublicKey.Verify for more details.
-func Verify(pub PublicKey, message, digest []byte, sig Signature, opts crypto.SignerOpts) (bool, error) {
+func Verify(pub PublicKey, message, digest []byte, sig Signature, opts SignerOpts) (bool, error) {
 	return pub.Verify(message, digest, sig, opts)
 }
 
 // VerifyMessage reports whether `sig` is a valid signature of message by `pub`.
 //
 // See PublicKey.VerifyMessage for more details.
-func VerifyMessage(pub PublicKey, message []byte, sig Signature, opts crypto.SignerOpts) (bool, error) {
+func VerifyMessage(pub PublicKey, message []byte, sig Signature, opts SignerOpts) (bool, error) {
 	return pub.VerifyMessage(message, sig, opts)
 }
 
 // VerifyDigest reports whether `sig` is a valid signature of digest by `pub`.
 //
 // See PublicKey.VerifyDigest for more details.
-func VerifyDigest(pub PublicKey, digest []byte, sig Signature, opts crypto.SignerOpts) (bool, error) {
+func VerifyDigest(pub PublicKey, digest []byte, sig Signature, opts SignerOpts) (bool, error) {
 	return pub.VerifyDigest(digest, sig, opts)
 }
 
-// SignerOptsWithHash is an interface that combines crypto.SignerOpts with SetHash and Clone methods
-type SignerOptsWithHash interface {
-	crypto.SignerOpts
-	Clone() SignerOptsWithHash
-	SetHash(crypto.Hash)
+// SignerOptsExtended is an interface that combines SignerOpts with Clone and SetHash methods
+type SignerOptsExtended interface {
+	SignerOpts
+	Clone() SignerOptsExtended
+	SetHash(Hash)
 }
 
-// ConvertSignerOpts converts crypto.SignerOpts to a specific SignerOpts type using generics.
+// ConvertSignerOpts converts SignerOpts to a specific SignerOpts type using generics.
 //
-// T must be a pointer type that implements SignerOptsWithHash.
+// T must be a pointer type that implements SignerOptsExtended.
 // The behavior is:
 // - If opts is nil, returns defaultOpts (as-is, even if nil)
 // - If opts is of type T, returns opts (caller should not modify the returned value)
 // - If opts is not of type T, creates a copy of defaultOpts, extracts HashFunc(), modifies the copy, and returns it
-func ConvertSignerOpts[T SignerOptsWithHash](opts crypto.SignerOpts, defaultOpts T) T {
+func ConvertSignerOpts[T SignerOptsExtended](opts SignerOpts, defaultOpts T) T {
 	// Create a dopt to avoid modifying the original defaultOpts
 	dopt := defaultOpts.Clone().(T)
 
@@ -537,7 +531,7 @@ type BatchVerifier interface {
 	// If digest is provided (not empty), and the Crpt implementation is appropriate for signing the
 	// pre-hashed messages (see SignMessage for details), Verify should try VerifyDigest first, then
 	// it should try VerifyMessage, it should returns true if either returns true.
-	Add(key PublicKey, message, digest []byte, sig Signature, opts crypto.SignerOpts) error
+	Add(key PublicKey, message, digest []byte, sig Signature, opts SignerOpts) error
 
 	// Verify verifies all the entries in the BatchVerifier, and returns
 	// if every signature in the batch is valid, and a vector of bools

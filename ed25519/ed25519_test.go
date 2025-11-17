@@ -31,7 +31,7 @@ func TestEd25519Crpt(t *testing.T) {
 
 	t.Run("KeyType & HashFunc", func(t *testing.T) {
 		assr.Equal(crpt.Ed25519, c.KeyType())
-		assr.Equal(crypto.SHA512, c.HashFunc())
+		assr.Equal(crpt.Hash(crypto.SHA512), c.HashFunc())
 	})
 
 	t.Run("Hash", func(t *testing.T) {
@@ -57,7 +57,7 @@ func TestEd25519Crpt(t *testing.T) {
 
 func TestEd25519_Comprehensive(t *testing.T) {
 	// Use SHA512 which works with the ed25519 implementation
-	hashFunc := crypto.SHA512
+	hashFunc := crpt.Hash(crypto.SHA512)
 
 	c, err := NewWithCryptoSignerOpts(hashFunc)
 	require.NoError(t, err)
@@ -300,7 +300,7 @@ func TestEd25519_ConcurrentOperations(t *testing.T) {
 
 func TestEd25519_HashFunctionConsistency(t *testing.T) {
 	// Test with SHA512 which is supported by the ed25519 implementation
-	hashFunc := crypto.SHA512
+	hashFunc := crpt.Hash(crypto.SHA512)
 
 	c, err := NewWithCryptoSignerOpts(hashFunc)
 	require.NoError(t, err)

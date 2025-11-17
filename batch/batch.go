@@ -5,8 +5,6 @@
 package batch
 
 import (
-	"crypto"
-
 	"github.com/crpt/go-crpt"
 	"github.com/crpt/go-crpt/ed25519"
 	//"github.com/crpt/go-crpt/sr25519"
@@ -14,7 +12,7 @@ import (
 
 // NewBatchVerifier checks if a key type implements BatchVerifier interface.
 // Currently only ed25519 & sr25519 supports batch verification.
-func NewBatchVerifier(kt crpt.KeyType, opts crypto.SignerOpts) (crpt.BatchVerifier, bool) {
+func NewBatchVerifier(kt crpt.KeyType, opts crpt.SignerOpts) (crpt.BatchVerifier, bool) {
 	switch kt {
 	case ed25519.KeyType:
 		return ed25519.NewBatchVerifierWithCryptoSignerOpts(opts), true

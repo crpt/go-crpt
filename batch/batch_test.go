@@ -43,7 +43,7 @@ func TestNewBatchVerifier(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, exists := NewBatchVerifier(tt.keyType, crypto.SHA512)
+			got, exists := NewBatchVerifier(tt.keyType, crpt.Hash(crypto.SHA512))
 			if tt.want {
 				require.True(t, exists, "Expected batch verifier to exist for key type %d", tt.keyType)
 				require.NotNil(t, got, "Expected non-nil batch verifier for key type %d", tt.keyType)
@@ -88,7 +88,7 @@ func TestSupportsBatchVerifier(t *testing.T) {
 
 func TestBatchVerifierFunctionality(t *testing.T) {
 	// Test that the returned batch verifier actually works
-	bv, exists := NewBatchVerifier(ed25519.KeyType, crypto.SHA512)
+	bv, exists := NewBatchVerifier(ed25519.KeyType, crpt.Hash(crypto.SHA512))
 	require.True(t, exists, "Ed25519 should support batch verification")
 	require.NotNil(t, bv, "Batch verifier should not be nil")
 
@@ -173,7 +173,7 @@ func TestBatchVerifierWithDigest(t *testing.T) {
 	message := []byte("test message 1")
 
 	// Test case 1: Verify that error case works - both message and digest are nil
-	bvErr, exists := NewBatchVerifier(ed25519.KeyType, crypto.SHA512)
+	bvErr, exists := NewBatchVerifier(ed25519.KeyType, crpt.Hash(crypto.SHA512))
 	require.True(t, exists)
 
 	sig1, err := priv.SignMessage(message, rand.Reader, nil)
@@ -186,7 +186,7 @@ func TestBatchVerifierWithDigest(t *testing.T) {
 	// Test case 2: Compare message vs digest behavior
 
 	// Test with message
-	bvMsg, exists := NewBatchVerifier(ed25519.KeyType, crypto.SHA512)
+	bvMsg, exists := NewBatchVerifier(ed25519.KeyType, crpt.Hash(crypto.SHA512))
 	require.True(t, exists)
 	err = bvMsg.Add(pub, message, nil, sig1, nil)
 	require.NoError(t, err)
@@ -200,7 +200,7 @@ func TestBatchVerifierWithDigest(t *testing.T) {
 	digest := sha512.Sum512(message)
 	sig2, err := priv.SignDigest(digest[:], rand.Reader, nil)
 	require.NoError(t, err)
-	bvDigest, exists := NewBatchVerifier(ed25519.KeyType, crypto.SHA512)
+	bvDigest, exists := NewBatchVerifier(ed25519.KeyType, crpt.Hash(crypto.SHA512))
 	require.True(t, exists)
 
 	opts := &ed25519.SignerOpts{Options: ved25519.Options{Hash: crypto.SHA512}}
