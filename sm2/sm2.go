@@ -35,11 +35,11 @@ const (
 // SignerOpts controls how SM2 operations are performed.
 type SignerOpts struct {
 	*gsm2.SM2SignerOption
-	hash crypto.Hash
+	hash crpt.Hash
 	uid  []byte
 }
 
-func NewSignerOpts(forceGMSign bool, uid []byte, hash crypto.Hash) *SignerOpts {
+func NewSignerOpts(forceGMSign bool, uid []byte, hash crpt.Hash) *SignerOpts {
 	return &SignerOpts{
 		SM2SignerOption: gsm2.NewSM2SignerOption(forceGMSign, uid),
 		hash:            hash,
@@ -48,10 +48,10 @@ func NewSignerOpts(forceGMSign bool, uid []byte, hash crypto.Hash) *SignerOpts {
 }
 
 // Type check
-var _ crypto.SignerOpts = (crpt.SignerOptsWithHash)(nil)
+var _ crpt.SignerOptsExtended = (*SignerOpts)(nil)
 
 // HashFunc implements crypto.SignerOpts.
-func (o *SignerOpts) HashFunc() crypto.Hash {
+func (o *SignerOpts) HashFunc() crpt.Hash {
 	if o == nil {
 		return crpt.NotHashed
 	}
@@ -59,7 +59,7 @@ func (o *SignerOpts) HashFunc() crypto.Hash {
 }
 
 // Clone creates a copy of the SignerOpts.
-func (o *SignerOpts) Clone() crpt.SignerOptsWithHash {
+func (o *SignerOpts) Clone() crpt.SignerOptsExtended {
 	if o == nil {
 		return nil
 	}
@@ -69,7 +69,7 @@ func (o *SignerOpts) Clone() crpt.SignerOptsWithHash {
 }
 
 // SetHash sets the hash function for the SignerOpts.
-func (o *SignerOpts) SetHash(hash crypto.Hash) {
+func (o *SignerOpts) SetHash(hash crpt.Hash) {
 	if o != nil {
 		o.hash = hash
 	}
@@ -80,7 +80,7 @@ var (
 	ErrWrongPublicKeySize  = fmt.Errorf("%w, should be %d bytes", crpt.ErrWrongPublicKeySize, PublicKeySize)
 	ErrWrongPrivateKeySize = fmt.Errorf("%w, should be %d bytes", crpt.ErrWrongPrivateKeySize, PrivateKeySize)
 	ErrInvalidSignature    = errors.New("sm2: invalid signature encoding")
-	DefaultSignerOpts      = NewSignerOpts(true, nil, crypto.SHA256)
+	DefaultSignerOpts      = NewSignerOpts(true, nil, crpt.Hash(crypto.SHA256))
 )
 
 // Address matches the global crpt.Address alias for clarity.
@@ -102,7 +102,7 @@ type PublicKey struct {
 var _ crpt.PublicKey = (*PublicKey)(nil)
 
 // NewPublicKey constructs a PublicKey from its uncompressed bytes.
-func NewPublicKey(b []byte, opts crypto.SignerOpts) (*PublicKey, error) {
+func NewPublicKey(b []byte, opts crpt.SignerOpts) (*PublicKey, error) {
 	if len(b) != PublicKeySize {
 		return nil, ErrWrongPublicKeySize
 	}
@@ -154,7 +154,7 @@ func (pub PublicKey) Address() Address {
 	return pub.raw
 }
 
-func (pub PublicKey) VerifyMessage(message []byte, sig crpt.Signature, opts crypto.SignerOpts,
+func (pub PublicKey) VerifyMessage(message []byte, sig crpt.Signature, opts crpt.SignerOpts,
 ) (bool, error) {
 	if err := validateSignature(sig); err != nil {
 		if errors.Is(err, crpt.ErrWrongSignatureSize) || errors.Is(err, ErrInvalidSignature) {
@@ -175,7 +175,7 @@ func (pub PublicKey) VerifyMessage(message []byte, sig crpt.Signature, opts cryp
 	return gsm2.VerifyASN1(pub.ecdsaPub, digest, sig), nil
 }
 
-func (pub PublicKey) VerifyDigest(digest []byte, sig crpt.Signature, opts crypto.SignerOpts,
+func (pub PublicKey) VerifyDigest(digest []byte, sig crpt.Signature, opts crpt.SignerOpts,
 ) (bool, error) {
 	if len(digest) == 0 {
 		return false, crpt.ErrEmptyMessage
@@ -205,7 +205,7 @@ type PrivateKey struct {
 var _ crpt.PrivateKey = (*PrivateKey)(nil)
 
 // NewPrivateKey constructs a PrivateKey from raw scalar bytes.
-func NewPrivateKey(b []byte, opts crypto.SignerOpts) (*PrivateKey, error) {
+func NewPrivateKey(b []byte, opts crpt.SignerOpts) (*PrivateKey, error) {
 	if len(b) != PrivateKeySize {
 		return nil, ErrWrongPrivateKeySize
 	}
@@ -259,7 +259,7 @@ func (priv PrivateKey) Public() crpt.PublicKey {
 	return pub
 }
 
-func (priv PrivateKey) SignMessage(message []byte, rand io.Reader, opts crypto.SignerOpts,
+func (priv PrivateKey) SignMessage(message []byte, rand io.Reader, opts crpt.SignerOpts,
 ) (crpt.Signature, error) {
 	if message == nil {
 		message = []byte{}
@@ -280,7 +280,7 @@ func (priv PrivateKey) SignMessage(message []byte, rand io.Reader, opts crypto.S
 	return sig, nil
 }
 
-func (priv PrivateKey) SignDigest(digest []byte, rand io.Reader, opts crypto.SignerOpts,
+func (priv PrivateKey) SignDigest(digest []byte, rand io.Reader, opts crpt.SignerOpts,
 ) (crpt.Signature, error) {
 	if len(digest) == 0 {
 		return nil, crpt.ErrEmptyMessage
@@ -290,18 +290,9 @@ func (priv PrivateKey) SignDigest(digest []byte, rand io.Reader, opts crypto.Sig
 	}
 	baseSopts, _ := priv.SignerOpts().(*SignerOpts)
 	so := crpt.ConvertSignerOpts(opts, baseSopts)
-	if !so.hash.Available() {
-		return nil, crpt.ErrInvalidHashFunc
-	}
-	var signerOpts crypto.SignerOpts
-	if _, ok := opts.(*SignerOpts); ok {
-		gmOpts := so.SM2SignerOption
-		if gmOpts == nil {
-			gmOpts = gsm2.NewSM2SignerOption(false, so.uid)
-		}
-		signerOpts = gmOpts
-	}
-	sig, err := priv.priv.Sign(rand, digest, signerOpts)
+	// Alwasy set forceGMSign=false for SignDigest
+	gmOpts := gsm2.NewSM2SignerOption(false, so.uid)
+	sig, err := priv.priv.Sign(rand, digest, gmOpts)
 	if err != nil {
 		return nil, err
 	}
@@ -331,7 +322,7 @@ func New(opts *SignerOpts) (*sm2Crpt, error) {
 }
 
 // NewWithCryptoSignerOpts creates an SM2 Crpt from generic crypto.SignerOpts.
-func NewWithCryptoSignerOpts(opts crypto.SignerOpts) (*sm2Crpt, error) {
+func NewWithCryptoSignerOpts(opts crpt.SignerOpts) (*sm2Crpt, error) {
 	so := crpt.ConvertSignerOpts(opts, DefaultSignerOpts)
 	return New(so)
 }
@@ -383,7 +374,7 @@ func (c *sm2Crpt) GenerateKey(rand io.Reader,
 	return cpriv.Public(), cpriv, nil
 }
 
-func (c *sm2Crpt) NewBatchVerifier(opts crypto.SignerOpts) (crpt.BatchVerifier, error) {
+func (c *sm2Crpt) NewBatchVerifier(opts crpt.SignerOpts) (crpt.BatchVerifier, error) {
 	return nil, crpt.ErrUnimplemented
 }
 

@@ -24,7 +24,7 @@ func init() {
 }
 
 var (
-	TestHashFunc          = crypto.SHA512
+	TestHashFunc          = crpt.Hash(crypto.SHA512)
 	TestEd25519PrivateKey = []byte{
 		0x7c, 0xbf, 0x09, 0xb2, 0x31, 0x35, 0x7f, 0x05, 0xb2, 0xd7, 0xcf, 0x8a, 0x43, 0x9e, 0xbb, 0xa1,
 		0x4f, 0x78, 0x80, 0x11, 0x5e, 0x26, 0x22, 0x34, 0x71, 0xf5, 0x69, 0xb7, 0x5d, 0x6f, 0xe7, 0x51,
@@ -172,7 +172,7 @@ func Test_XxxFromBytes_SignXxx_Verify(t *testing.T, c crpt.Crpt, privateKey []by
 func Test_Batch(t *testing.T, c crpt.Crpt, kt crpt.KeyType) {
 	req := require.New(t)
 
-	v, ok := batch.NewBatchVerifier(kt, crypto.SHA512)
+	v, ok := batch.NewBatchVerifier(kt, crpt.Hash(crypto.SHA512))
 	if !ok {
 		return
 	}
@@ -224,7 +224,7 @@ func Test_NewBatchVerifier(t *testing.T, c crpt.Crpt, kt crpt.KeyType) {
 	assr.NotNil(bv, "Batch verifier should not be nil when supported")
 
 	// Test with SHA512 options
-	opts := crypto.SHA512
+	opts := crpt.Hash(crypto.SHA512)
 	bvWithOpts, err := c.NewBatchVerifier(opts)
 	assr.NoError(err, "Should support batch verification with options")
 	assr.NotNil(bvWithOpts, "Batch verifier with options should not be nil")

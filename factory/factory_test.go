@@ -19,20 +19,20 @@ func TestNew(t *testing.T) {
 	tests := []struct {
 		name     string
 		keyType  crpt.KeyType
-		hashFunc crypto.Hash
+		hashFunc crpt.Hash
 		wantErr  bool
 		errType  error
 	}{
 		{
 			name:     "Ed25519 with SHA256 should work",
 			keyType:  crpt.Ed25519,
-			hashFunc: crypto.SHA256,
+			hashFunc: crpt.Hash(crypto.SHA256),
 			wantErr:  false,
 		},
 		{
 			name:     "Ed25519 with SHA512 should work",
 			keyType:  crpt.Ed25519,
-			hashFunc: crypto.SHA512,
+			hashFunc: crpt.Hash(crypto.SHA512),
 			wantErr:  false,
 		},
 		{
@@ -44,21 +44,21 @@ func TestNew(t *testing.T) {
 		{
 			name:     "Invalid key type should fail",
 			keyType:  crpt.MaxCrpt,
-			hashFunc: crypto.SHA256,
+			hashFunc: crpt.Hash(crypto.SHA256),
 			wantErr:  true,
 			errType:  crpt.ErrUnsupportedKeyType,
 		},
 		{
 			name:     "Unknown key type should fail",
 			keyType:  crpt.KeyType(255),
-			hashFunc: crypto.SHA256,
+			hashFunc: crpt.Hash(crypto.SHA256),
 			wantErr:  true,
 			errType:  crpt.ErrUnsupportedKeyType,
 		},
 		{
 			name:     "Zero key type should fail",
 			keyType:  crpt.KeyType(0),
-			hashFunc: crypto.SHA256,
+			hashFunc: crpt.Hash(crypto.SHA256),
 			wantErr:  true,
 			errType:  crpt.ErrUnsupportedKeyType,
 		},
@@ -106,33 +106,33 @@ func TestMustNew(t *testing.T) {
 	tests := []struct {
 		name        string
 		keyType     crpt.KeyType
-		hashFunc    crypto.Hash
+		hashFunc    crpt.Hash
 		shouldPanic bool
 		panicMsg    string
 	}{
 		{
 			name:        "Ed25519 with SHA256 should work",
 			keyType:     crpt.Ed25519,
-			hashFunc:    crypto.SHA256,
+			hashFunc:    crpt.Hash(crypto.SHA256),
 			shouldPanic: false,
 		},
 		{
 			name:        "Ed25519 with SHA512 should work",
 			keyType:     crpt.Ed25519,
-			hashFunc:    crypto.SHA512,
+			hashFunc:    crpt.Hash(crypto.SHA512),
 			shouldPanic: false,
 		},
 		{
 			name:        "Invalid key type should panic",
 			keyType:     crpt.MaxCrpt,
-			hashFunc:    crypto.SHA256,
+			hashFunc:    crpt.Hash(crypto.SHA256),
 			shouldPanic: true,
 			panicMsg:    crpt.ErrUnsupportedKeyType.Error(),
 		},
 		{
 			name:        "Unknown key type should panic",
 			keyType:     crpt.KeyType(255),
-			hashFunc:    crypto.SHA256,
+			hashFunc:    crpt.Hash(crypto.SHA256),
 			shouldPanic: true,
 			panicMsg:    crpt.ErrUnsupportedKeyType.Error(),
 		},
@@ -192,7 +192,7 @@ func TestMustNew_HashFunctionPanic(t *testing.T) {
 	}()
 
 	// Use a hash function that's likely not available
-	unavailableHash := crypto.Hash(999)
+	unavailableHash := crpt.Hash(999)
 	MustNew(crpt.Ed25519, unavailableHash)
 }
 
@@ -200,20 +200,20 @@ func TestNewWithKeyTypeStr(t *testing.T) {
 	tests := []struct {
 		name       string
 		keyTypeStr string
-		hashFunc   crypto.Hash
+		hashFunc   crpt.Hash
 		wantErr    bool
 		errType    error
 	}{
 		{
 			name:       "Ed25519 string with SHA256 should work",
 			keyTypeStr: "Ed25519",
-			hashFunc:   crypto.SHA256,
+			hashFunc:   crpt.Hash(crypto.SHA256),
 			wantErr:    false,
 		},
 		{
 			name:       "Ed25519 string with SHA512 should work",
 			keyTypeStr: "Ed25519",
-			hashFunc:   crypto.SHA512,
+			hashFunc:   crpt.Hash(crypto.SHA512),
 			wantErr:    false,
 		},
 		{
@@ -225,40 +225,40 @@ func TestNewWithKeyTypeStr(t *testing.T) {
 		{
 			name:       "SM2 string with SHA256 should work",
 			keyTypeStr: "SM2",
-			hashFunc:   crypto.SHA256,
+			hashFunc:   crpt.Hash(crypto.SHA256),
 			wantErr:    false,
 		},
 		{
 			name:       "SM2 string with SHA512 should work",
 			keyTypeStr: "SM2",
-			hashFunc:   crypto.SHA512,
+			hashFunc:   crpt.Hash(crypto.SHA512),
 			wantErr:    false,
 		},
 		{
 			name:       "Case sensitive Ed25519 lowercase should work",
 			keyTypeStr: "ed25519",
-			hashFunc:   crypto.SHA256,
+			hashFunc:   crpt.Hash(crypto.SHA256),
 			wantErr:    false,
 			errType:    crpt.ErrUnsupportedKeyType,
 		},
 		{
 			name:       "Case sensitive SM2 lowercase should work",
 			keyTypeStr: "sm2",
-			hashFunc:   crypto.SHA256,
+			hashFunc:   crpt.Hash(crypto.SHA256),
 			wantErr:    false,
 			errType:    crpt.ErrUnsupportedKeyType,
 		},
 		{
 			name:       "Invalid key type string should fail",
 			keyTypeStr: "InvalidType",
-			hashFunc:   crypto.SHA256,
+			hashFunc:   crpt.Hash(crypto.SHA256),
 			wantErr:    true,
 			errType:    crpt.ErrUnsupportedKeyType,
 		},
 		{
 			name:       "Empty key type string should fail",
 			keyTypeStr: "",
-			hashFunc:   crypto.SHA256,
+			hashFunc:   crpt.Hash(crypto.SHA256),
 			wantErr:    true,
 			errType:    crpt.ErrUnsupportedKeyType,
 		},
@@ -307,37 +307,37 @@ func TestMustNewWithKeyTypeStr(t *testing.T) {
 	tests := []struct {
 		name        string
 		keyTypeStr  string
-		hashFunc    crypto.Hash
+		hashFunc    crpt.Hash
 		shouldPanic bool
 	}{
 		{
 			name:        "Ed25519 string with SHA256 should not panic",
 			keyTypeStr:  "Ed25519",
-			hashFunc:    crypto.SHA256,
+			hashFunc:    crpt.Hash(crypto.SHA256),
 			shouldPanic: false,
 		},
 		{
 			name:        "Ed25519 string with SHA512 should not panic",
 			keyTypeStr:  "Ed25519",
-			hashFunc:    crypto.SHA512,
+			hashFunc:    crpt.Hash(crypto.SHA512),
 			shouldPanic: false,
 		},
 		{
 			name:        "SM2 string with SHA256 should not panic",
 			keyTypeStr:  "SM2",
-			hashFunc:    crypto.SHA256,
+			hashFunc:    crpt.Hash(crypto.SHA256),
 			shouldPanic: false,
 		},
 		{
 			name:        "Invalid key type string should panic",
 			keyTypeStr:  "InvalidType",
-			hashFunc:    crypto.SHA256,
+			hashFunc:    crpt.Hash(crypto.SHA256),
 			shouldPanic: true,
 		},
 		{
 			name:        "Empty key type string should panic",
 			keyTypeStr:  "",
-			hashFunc:    crypto.SHA256,
+			hashFunc:    crpt.Hash(crypto.SHA256),
 			shouldPanic: true,
 		},
 	}
@@ -381,10 +381,10 @@ func TestMustNewWithKeyTypeStr(t *testing.T) {
 
 func TestFactory_EdgeCases(t *testing.T) {
 	t.Run("Multiple instances should be independent", func(t *testing.T) {
-		crypt1, err := New(crpt.Ed25519, crypto.SHA512)
+		crypt1, err := New(crpt.Ed25519, crpt.Hash(crypto.SHA512))
 		require.NoError(t, err)
 
-		crypt2, err := New(crpt.Ed25519, crypto.SHA512)
+		crypt2, err := New(crpt.Ed25519, crpt.Hash(crypto.SHA512))
 		require.NoError(t, err)
 
 		// Generate different keys from each instance
@@ -422,10 +422,10 @@ func TestFactory_EdgeCases(t *testing.T) {
 	})
 
 	t.Run("Different hash functions should work", func(t *testing.T) {
-		hashFuncs := []crypto.Hash{
-			crypto.SHA256,
-			crypto.SHA512,
-			0, // Zero hash function
+		hashFuncs := []crpt.Hash{
+			crpt.Hash(crypto.SHA256),
+			crpt.Hash(crypto.SHA512),
+			crpt.NotHashed, // Zero hash function
 		}
 
 		for _, hf := range hashFuncs {

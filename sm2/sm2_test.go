@@ -23,8 +23,8 @@ var testSM2PrivateKey = []byte{
 }
 
 var (
-	digestSHA256Opts = NewSignerOpts(false, nil, crypto.SHA256)
-	digestSHA512Opts = NewSignerOpts(false, nil, crypto.SHA512)
+	digestSHA256Opts = NewSignerOpts(false, nil, crpt.Hash(crypto.SHA256))
+	digestSHA512Opts = NewSignerOpts(false, nil, crpt.Hash(crypto.SHA512))
 )
 
 func TestSM2Crpt(t *testing.T) {
@@ -40,7 +40,7 @@ func TestSM2Crpt(t *testing.T) {
 
 	t.Run("KeyType & HashFunc", func(t *testing.T) {
 		assr.Equal(crpt.SM2, c.KeyType())
-		assr.Equal(crypto.SHA256, c.HashFunc())
+		assr.Equal(crpt.Hash(crypto.SHA256), c.HashFunc())
 	})
 
 	t.Run("Hash helpers", func(t *testing.T) {
@@ -137,10 +137,10 @@ func TestSM2_SignatureConversions(t *testing.T) {
 }
 
 func TestSM2_CustomHashAndUID(t *testing.T) {
-	opts := NewSignerOpts(true, []byte("custom-agent"), crypto.SHA512)
+	opts := NewSignerOpts(true, []byte("custom-agent"), crpt.Hash(crypto.SHA512))
 	c, err := New(opts)
 	require.NoError(t, err)
-	require.Equal(t, crypto.SHA512, c.HashFunc())
+	require.Equal(t, crpt.Hash(crypto.SHA512), c.HashFunc())
 
 	pub, priv, err := c.GenerateKey(rand.Reader)
 	require.NoError(t, err)
