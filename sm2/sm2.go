@@ -6,7 +6,6 @@
 package sm2
 
 import (
-	"crypto"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	crand "crypto/rand"
@@ -80,7 +79,7 @@ var (
 	ErrWrongPublicKeySize  = fmt.Errorf("%w, should be %d bytes", crpt.ErrWrongPublicKeySize, PublicKeySize)
 	ErrWrongPrivateKeySize = fmt.Errorf("%w, should be %d bytes", crpt.ErrWrongPrivateKeySize, PrivateKeySize)
 	ErrInvalidSignature    = errors.New("sm2: invalid signature encoding")
-	DefaultSignerOpts      = NewSignerOpts(true, nil, crpt.Hash(crypto.SHA256))
+	DefaultSignerOpts      = NewSignerOpts(true, nil, crpt.SM3)
 )
 
 // Address matches the global crpt.Address alias for clarity.

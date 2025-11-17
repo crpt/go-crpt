@@ -13,6 +13,7 @@ import (
 	"github.com/crpt/go-crpt"
 	"github.com/crpt/go-crpt/internal/test"
 	. "github.com/crpt/go-crpt/sm2"
+	_ "github.com/crpt/go-crpt/sm3"
 )
 
 var testSM2PrivateKey = []byte{
@@ -23,7 +24,7 @@ var testSM2PrivateKey = []byte{
 }
 
 var (
-	digestSHA256Opts = NewSignerOpts(false, nil, crpt.Hash(crypto.SHA256))
+	digestSM3Opts    = NewSignerOpts(false, nil, crpt.SM3)
 	digestSHA512Opts = NewSignerOpts(false, nil, crpt.Hash(crypto.SHA512))
 )
 
@@ -40,7 +41,7 @@ func TestSM2Crpt(t *testing.T) {
 
 	t.Run("KeyType & HashFunc", func(t *testing.T) {
 		assr.Equal(crpt.SM2, c.KeyType())
-		assr.Equal(crpt.Hash(crypto.SHA256), c.HashFunc())
+		assr.Equal(crpt.SM3, c.HashFunc())
 	})
 
 	t.Run("Hash helpers", func(t *testing.T) {
@@ -83,7 +84,7 @@ func TestSM2_ErrorCases(t *testing.T) {
 		require.NoError(t, err)
 
 		digest := make([]byte, 32)
-		ok, err := pub.VerifyDigest(digest, []byte{0x30}, digestSHA256Opts)
+		ok, err := pub.VerifyDigest(digest, []byte{0x30}, digestSM3Opts)
 		require.NoError(t, err)
 		require.False(t, ok)
 	})
@@ -262,7 +263,7 @@ func testSM2FromBytesSignVerify(t *testing.T, c crpt.Crpt, privateKey []byte) {
 	assr.NotZero(len(sig2))
 
 	digest := c.Hash(message)
-	sigDigest, err := priv.SignDigest(digest, rand.Reader, digestSHA256Opts)
+	sigDigest, err := priv.SignDigest(digest, rand.Reader, digestSM3Opts)
 	req.NoError(err)
 
 	pub := priv.Public()
@@ -275,11 +276,11 @@ func testSM2FromBytesSignVerify(t *testing.T, c crpt.Crpt, privateKey []byte) {
 	req.NoError(err)
 	assr.False(ok)
 
-	ok, err = pub.VerifyDigest(digest, sigDigest, digestSHA256Opts)
+	ok, err = pub.VerifyDigest(digest, sigDigest, digestSM3Opts)
 	req.NoError(err)
 	assr.True(ok)
 
-	ok, err = pub.VerifyDigest(digest, sig2, digestSHA256Opts)
+	ok, err = pub.VerifyDigest(digest, sig2, digestSM3Opts)
 	req.NoError(err)
 	assr.False(ok)
 
