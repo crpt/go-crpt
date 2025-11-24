@@ -16,10 +16,10 @@ import (
 	"io"
 	"math/big"
 
-	_ "github.com/crpt/go-crpt/sm3"
 	gsm2 "github.com/emmansun/gmsm/sm2"
 
 	"github.com/crpt/go-crpt"
+	_ "github.com/crpt/go-crpt/sm3"
 )
 
 const (
@@ -106,13 +106,7 @@ func NewPublicKey(b []byte, opts crpt.SignerOpts) (*PublicKey, error) {
 	if len(b) != PublicKeySize {
 		return nil, ErrWrongPublicKeySize
 	}
-	if opts == nil {
-		return nil, errors.New("sm2: opts is nil")
-	}
-	so, ok := opts.(*SignerOpts)
-	if !ok {
-		return nil, errors.New("sm2: opts is not of type *SignerOpts")
-	}
+	so := crpt.ConvertSignerOpts(opts, DefaultSignerOpts)
 	ecdsaPub, err := gsm2.NewPublicKey(b)
 	if err != nil {
 		return nil, err
