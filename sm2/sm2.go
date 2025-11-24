@@ -16,6 +16,7 @@ import (
 	"io"
 	"math/big"
 
+	_ "github.com/crpt/go-crpt/sm3"
 	gsm2 "github.com/emmansun/gmsm/sm2"
 
 	"github.com/crpt/go-crpt"
